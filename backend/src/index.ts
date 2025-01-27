@@ -11,8 +11,6 @@ import memPool from './api/mempool';
 import diskCache from './api/disk-cache';
 import statistics from './api/statistics/statistics';
 import websocketHandler from './api/websocket-handler';
-import bisq from './api/bisq/bisq';
-import bisqMarkets from './api/bisq/markets';
 import logger from './logger';
 import backendInfo from './api/backend-info';
 import loadingIndicators from './api/loading-indicators';
@@ -32,9 +30,9 @@ import networkSyncService from './tasks/lightning/network-sync.service';
 import statisticsRoutes from './api/statistics/statistics.routes';
 import pricesRoutes from './api/prices/prices.routes';
 import miningRoutes from './api/mining/mining-routes';
-import bisqRoutes from './api/bisq/bisq.routes';
 import liquidRoutes from './api/liquid/liquid.routes';
 import bitcoinRoutes from './api/bitcoin/bitcoin.routes';
+import servicesRoutes from './api/services/services-routes';
 import fundingTxFetcher from './tasks/lightning/sync-tasks/funding-tx-fetcher';
 import forensicsService from './tasks/lightning/forensics.service';
 import priceUpdater from './tasks/price-updater';
@@ -45,10 +43,18 @@ import { formatBytes, getBytesUnit } from './utils/format';
 import redisCache from './api/redis-cache';
 import accelerationApi from './api/services/acceleration';
 import bitcoinCoreRoutes from './api/bitcoin/bitcoin-core.routes';
+import bitcoinSecondClient from './api/bitcoin/bitcoin-second-client';
+import accelerationRoutes from './api/acceleration/acceleration.routes';
+import aboutRoutes from './api/about.routes';
+import mempoolBlocks from './api/mempool-blocks';
+import walletApi from './api/services/wallets';
+import stratumApi from './api/services/stratum';
 
 class Server {
   private wss: WebSocket.Server | undefined;
+  private wssUnixSocket: WebSocket.Server | undefined;
   private server: http.Server | undefined;
+  private serverUnixSocket: http.Server | undefined;
   private app: Application;
   private currentBackendRetryInterval = 1;
   private backendRetryCount = 0;
@@ -129,19 +135,25 @@ class Server {
       })
       .use(express.urlencoded({ extended: true }))
       .use(express.text({ type: ['text/plain', 'application/base64'] }))
+      .use(express.json())
       ;
 
-    if (config.DATABASE.ENABLED) {
+    if (config.DATABASE.ENABLED && config.FIAT_PRICE.ENABLED) {
       await priceUpdater.$initializeLatestPriceWithDb();
     }
 
     this.server = http.createServer(this.app);
     this.wss = new WebSocket.Server({ server: this.server });
+    if (config.MEMPOOL.UNIX_SOCKET_PATH) {
+      this.serverUnixSocket = http.createServer(this.app);
+      this.wssUnixSocket = new WebSocket.Server({ server: this.serverUnixSocket });
+    }
 
     this.setUpWebsocketHandling();
 
     await poolsUpdater.updatePoolsJson(); // Needs to be done before loading the disk cache because we sometimes wipe it
     await syncAssets.syncAssets$();
+    await mempoolBlocks.updatePools$();
     if (config.MEMPOOL.ENABLED) {
       if (config.MEMPOOL.CACHE_ENABLED) {
         await diskCache.$loadMempoolCache();
@@ -168,7 +180,9 @@ class Server {
       setInterval(refreshIcons, 3600_000);
     }
 
-    priceUpdater.$run();
+    if (config.FIAT_PRICE.ENABLED) {
+      priceUpdater.$run();
+    }
     await chainTips.updateOrphanedBlocks();
 
     this.setUpHttpApiRoutes();
@@ -178,13 +192,6 @@ class Server {
     }
 
     setInterval(() => { this.healthCheck(); }, 2500);
-
-    if (config.BISQ.ENABLED) {
-      bisq.startBisqService();
-      bisq.setPriceCallbackFunction((price) => websocketHandler.setExtraInitData('bsq-price', price));
-      blocks.setNewBlockCallback(bisq.handleNewBitcoinBlock.bind(bisq));
-      bisqMarkets.startBisqService();
-    }
 
     if (config.LIGHTNING.ENABLED) {
       this.$runLightningBackend();
@@ -197,6 +204,18 @@ class Server {
         logger.notice(`Mempool Server is running on port ${config.MEMPOOL.HTTP_PORT}`);
       }
     });
+
+    if (this.serverUnixSocket) {
+      this.serverUnixSocket.listen(config.MEMPOOL.UNIX_SOCKET_PATH, () => {
+        if (worker) {
+          logger.info(`Mempool Server worker #${process.pid} started`);
+        } else {
+          logger.notice(`Mempool Server is listening on ${config.MEMPOOL.UNIX_SOCKET_PATH}`);
+        }
+      });
+    }
+
+    poolsUpdater.$startService();
   }
 
   async runMainUpdateLoop(): Promise<void> {
@@ -213,14 +232,22 @@ class Server {
         }
       }
       const newMempool = await bitcoinApi.$getRawMempool();
-      const newAccelerations = await accelerationApi.$fetchAccelerations();
+      const minFeeMempool = memPool.limitGBT ? await bitcoinSecondClient.getRawMemPool() : null;
+      const minFeeTip = memPool.limitGBT ? await bitcoinSecondClient.getBlockCount() : -1;
+      const latestAccelerations = await accelerationApi.$updateAccelerations();
       const numHandledBlocks = await blocks.$updateBlocks();
       const pollRate = config.MEMPOOL.POLL_RATE_MS * (indexer.indexerIsRunning() ? 10 : 1);
       if (numHandledBlocks === 0) {
-        await memPool.$updateMempool(newMempool, newAccelerations, pollRate);
+        await memPool.$updateMempool(newMempool, latestAccelerations, minFeeMempool, minFeeTip, pollRate);
       }
       indexer.$run();
-      priceUpdater.$run();
+      if (config.WALLETS.ENABLED) {
+        // might take a while, so run in the background
+        walletApi.$syncWallets();
+      }
+      if (config.FIAT_PRICE.ENABLED) {
+        priceUpdater.$run();
+      }
 
       // rerun immediately if we skipped the mempool update, otherwise wait POLL_RATE_MS
       const elapsed = Date.now() - start;
@@ -266,8 +293,12 @@ class Server {
 
   setUpWebsocketHandling(): void {
     if (this.wss) {
-      websocketHandler.setWebsocketServer(this.wss);
+      websocketHandler.addWebsocketServer(this.wss);
     }
+    if (this.wssUnixSocket) {
+      websocketHandler.addWebsocketServer(this.wssUnixSocket);
+    }
+
     if (Common.isLiquid() && config.DATABASE.ENABLED) {
       blocks.setNewBlockCallback(async () => {
         try {
@@ -284,22 +315,28 @@ class Server {
       memPool.setAsyncMempoolChangedCallback(websocketHandler.$handleMempoolChange.bind(websocketHandler));
       blocks.setNewAsyncBlockCallback(websocketHandler.handleNewBlock.bind(websocketHandler));
     }
-    priceUpdater.setRatesChangedCallback(websocketHandler.handleNewConversionRates.bind(websocketHandler));
+    if (config.FIAT_PRICE.ENABLED) {
+      priceUpdater.setRatesChangedCallback(websocketHandler.handleNewConversionRates.bind(websocketHandler));
+    }
     loadingIndicators.setProgressChangedCallback(websocketHandler.handleLoadingChanged.bind(websocketHandler));
+
+    accelerationApi.connectWebsocket();
+    if (config.STRATUM.ENABLED) {
+      stratumApi.connectWebsocket();
+    }
   }
-  
+
   setUpHttpApiRoutes(): void {
     bitcoinRoutes.initRoutes(this.app);
-    bitcoinCoreRoutes.initRoutes(this.app);
+    if (config.MEMPOOL.OFFICIAL) {
+      bitcoinCoreRoutes.initRoutes(this.app);
+    }
     pricesRoutes.initRoutes(this.app);
     if (config.STATISTICS.ENABLED && config.DATABASE.ENABLED && config.MEMPOOL.ENABLED) {
       statisticsRoutes.initRoutes(this.app);
     }
     if (Common.indexingEnabled() && config.MEMPOOL.ENABLED) {
       miningRoutes.initRoutes(this.app);
-    }
-    if (config.BISQ.ENABLED) {
-      bisqRoutes.initRoutes(this.app);
     }
     if (Common.isLiquid()) {
       liquidRoutes.initRoutes(this.app);
@@ -308,6 +345,15 @@ class Server {
       generalLightningRoutes.initRoutes(this.app);
       nodesRoutes.initRoutes(this.app);
       channelsRoutes.initRoutes(this.app);
+    }
+    if (config.MEMPOOL_SERVICES.ACCELERATIONS) {
+      accelerationRoutes.initRoutes(this.app);
+    }
+    if (config.WALLETS.ENABLED) {
+      servicesRoutes.initRoutes(this.app);
+    }
+    if (!config.MEMPOOL.OFFICIAL) {
+      aboutRoutes.initRoutes(this.app);
     }
   }
 
@@ -335,6 +381,12 @@ class Server {
     logger.debug(`onExit for signal: ${exitEvent}`);
     if (config.DATABASE.ENABLED) {
       DB.releasePidLock();
+    }
+    this.server?.close();
+    this.serverUnixSocket?.close();
+    this.wss?.close();
+    if (this.wssUnixSocket) {
+      this.wssUnixSocket.close();
     }
     process.exit(code);
   }

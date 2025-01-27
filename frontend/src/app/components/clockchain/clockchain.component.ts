@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, Input, OnChanges, ChangeDetectorRef } from '@angular/core';
 import { firstValueFrom, Subscription } from 'rxjs';
-import { StateService } from '../../services/state.service';
+import { StateService } from '@app/services/state.service';
 
 @Component({
   selector: 'app-clockchain',
@@ -11,7 +11,7 @@ import { StateService } from '../../services/state.service';
 export class ClockchainComponent implements OnInit, OnChanges, OnDestroy {
   @Input() width: number = 300;
   @Input() height: number = 60;
-  @Input() mode: 'mempool' | 'mined';
+  @Input() mode: 'mempool' | 'mined' | 'none';
   @Input() index: number = 0;
 
   mempoolBlocks: number = 3;

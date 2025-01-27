@@ -1,8 +1,10 @@
 import { Component, ElementRef, HostListener, OnInit, OnDestroy, ViewChild, Input, ChangeDetectorRef, ChangeDetectionStrategy, AfterViewChecked } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { MarkBlockState, StateService } from '../../services/state.service';
-import { specialBlocks } from '../../app.constants';
-import { BlockExtended } from '../../interfaces/node-api.interface';
+import { MarkBlockState, StateService } from '@app/services/state.service';
+import { specialBlocks } from '@app/app.constants';
+import { BlockExtended } from '@interfaces/node-api.interface';
+import { Router, ActivatedRoute } from '@angular/router';
+import { handleDemoRedirect } from '../../shared/common.utils';
 
 @Component({
   selector: 'app-start',
@@ -24,7 +26,7 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
   timeLtrSubscription: Subscription;
   timeLtr: boolean = this.stateService.timeLtr.value;
   chainTipSubscription: Subscription;
-  chainTip: number = 100;
+  chainTip: number = -1;
   tipIsSet: boolean = false;
   lastMark: MarkBlockState;
   markBlockSubscription: Subscription;
@@ -32,7 +34,6 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
   @ViewChild('blockchainWrapper', { static: true }) blockchainWrapper: ElementRef;
   @ViewChild('blockchainContainer') blockchainContainer: ElementRef;
   resetScrollSubscription: Subscription;
-  menuSubscription: Subscription;
 
   isMobile: boolean = false;
   isiOS: boolean = false;
@@ -56,15 +57,14 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
   scrollLeft: number = null;
 
   chainWidth: number = window.innerWidth;
-  menuOpen: boolean = false;
-  menuSliding: boolean = false;
-  menuTimeout: number;
 
   hasMenu = false;
 
   constructor(
-    private stateService: StateService,
+    public stateService: StateService,
     private cd: ChangeDetectorRef,
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.isiOS = ['iPhone','iPod','iPad'].includes((navigator as any)?.userAgentData?.platform || navigator.platform);
     if (this.stateService.network === '') {
@@ -73,6 +73,8 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
   }
 
   ngOnInit() {
+    handleDemoRedirect(this.route, this.router);
+
     this.firstPageWidth = 40 + (this.blockWidth * this.dynamicBlocksAmount);
     this.blockCounterSubscription = this.stateService.blocks$.subscribe((blocks) => {
       this.blockCount = blocks.length;
@@ -165,12 +167,6 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
       } 
     });
 
-    this.menuSubscription = this.stateService.menuOpen$.subscribe((open) => {
-      if (this.menuOpen !== open) {
-        this.menuOpen = open;
-        this.applyMenuScroll(this.menuOpen);
-      }
-    });
   }
 
   ngAfterViewChecked(): void {
@@ -223,15 +219,6 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
     }
   }
 
-  applyMenuScroll(opening: boolean): void {
-    this.menuSliding = true;
-    window.clearTimeout(this.menuTimeout);
-    this.menuTimeout = window.setTimeout(() => {
-      this.menuSliding = false;
-      this.cd.markForCheck();
-    }, 300);
-  }
-
   @HostListener('window:resize', ['$event'])
   onResize(): void {
     this.chainWidth = window.innerWidth;
@@ -253,7 +240,7 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.minScrollWidth = 40 + (8 * this.blockWidth) + (this.pageWidth * 2);
 
     if (firstVisibleBlock != null) {
-      this.scrollToBlock(firstVisibleBlock, offset);
+      this.scrollToBlock(firstVisibleBlock, offset + (this.isMobile ? this.blockWidth : 0));
     } else {
       this.updatePages();
     }
@@ -518,6 +505,5 @@ export class StartComponent implements OnInit, AfterViewChecked, OnDestroy {
     this.markBlockSubscription.unsubscribe();
     this.blockCounterSubscription.unsubscribe();
     this.resetScrollSubscription.unsubscribe();
-    this.menuSubscription.unsubscribe();
   }
 }

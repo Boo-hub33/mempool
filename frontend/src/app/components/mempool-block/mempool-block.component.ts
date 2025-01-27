@@ -1,12 +1,14 @@
-import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
-import { StateService } from '../../services/state.service';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
+import { detectWebGL } from '@app/shared/graphs.utils';
+import { StateService } from '@app/services/state.service';
 import { ActivatedRoute, ParamMap } from '@angular/router';
 import { switchMap, map, tap, filter } from 'rxjs/operators';
-import { MempoolBlock, TransactionStripped } from '../../interfaces/websocket.interface';
+import { MempoolBlock } from '@interfaces/websocket.interface';
+import { TransactionStripped } from '@interfaces/node-api.interface';
 import { Observable, BehaviorSubject } from 'rxjs';
-import { SeoService } from '../../services/seo.service';
-import { seoDescriptionNetwork } from '../../shared/common.utils';
-import { WebsocketService } from '../../services/websocket.service';
+import { SeoService } from '@app/services/seo.service';
+import { seoDescriptionNetwork } from '@app/shared/common.utils';
+import { WebsocketService } from '@app/services/websocket.service';
 
 @Component({
   selector: 'app-mempool-block',
@@ -29,8 +31,9 @@ export class MempoolBlockComponent implements OnInit, OnDestroy {
     private seoService: SeoService,
     private websocketService: WebsocketService,
     private cd: ChangeDetectorRef,
+    @Inject(PLATFORM_ID) private platformId: Object,
   ) {
-    this.webGlEnabled = detectWebGL();
+    this.webGlEnabled = this.stateService.isBrowser && detectWebGL();
   }
 
   ngOnInit(): void {
@@ -68,7 +71,7 @@ export class MempoolBlockComponent implements OnInit, OnDestroy {
         })
       );
 
-    this.mempoolBlockTransactions$ = this.stateService.liveMempoolBlockTransactions$.pipe(map(txMap => Object.values(txMap)));
+    this.mempoolBlockTransactions$ = this.stateService.liveMempoolBlockTransactions$.pipe(map(({transactions}) => Object.values(transactions)));
 
     this.network$ = this.stateService.networkChanged$;
   }
@@ -92,10 +95,4 @@ export class MempoolBlockComponent implements OnInit, OnDestroy {
   setTxPreview(event: TransactionStripped | void): void {
     this.previewTx = event;
   }
-}
-
-function detectWebGL() {
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-  return (gl && gl instanceof WebGLRenderingContext);
 }

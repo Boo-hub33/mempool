@@ -1,16 +1,16 @@
-import { Component, ComponentRef, ViewChild, HostListener, Input, Output, EventEmitter,
+import { Component, ViewChild, Input, Output, EventEmitter,
   OnInit, OnDestroy, OnChanges, ChangeDetectionStrategy, ChangeDetectorRef, AfterViewInit } from '@angular/core';
-import { StateService } from '../../services/state.service';
-import { MempoolBlockDelta, TransactionStripped } from '../../interfaces/websocket.interface';
-import { BlockOverviewGraphComponent } from '../../components/block-overview-graph/block-overview-graph.component';
-import { Subscription, BehaviorSubject, merge, of, timer } from 'rxjs';
-import { switchMap, filter, concatMap, map } from 'rxjs/operators';
-import { WebsocketService } from '../../services/websocket.service';
-import { RelativeUrlPipe } from '../../shared/pipes/relative-url/relative-url.pipe';
+import { StateService } from '@app/services/state.service';
+import { MempoolBlockDelta, isMempoolDelta } from '@interfaces/websocket.interface';
+import { TransactionStripped } from '@interfaces/node-api.interface';
+import { BlockOverviewGraphComponent } from '@components/block-overview-graph/block-overview-graph.component';
+import { Subscription, BehaviorSubject } from 'rxjs';
+import { WebsocketService } from '@app/services/websocket.service';
+import { RelativeUrlPipe } from '@app/shared/pipes/relative-url/relative-url.pipe';
 import { Router } from '@angular/router';
-import { Color } from '../block-overview-graph/sprite-types';
-import TxView from '../block-overview-graph/tx-view';
-import { FilterMode } from '../../shared/filters.utils';
+import { Color } from '@components/block-overview-graph/sprite-types';
+import TxView from '@components/block-overview-graph/tx-view';
+import { FilterMode, GradientMode } from '@app/shared/filters.utils';
 
 @Component({
   selector: 'app-mempool-block-overview',
@@ -24,23 +24,20 @@ export class MempoolBlockOverviewComponent implements OnInit, OnDestroy, OnChang
   @Input() overrideColors: ((tx: TxView) => Color) | null = null;
   @Input() filterFlags: bigint | undefined = undefined;
   @Input() filterMode: FilterMode = 'and';
+  @Input() gradientMode: GradientMode = 'fee';
   @Output() txPreviewEvent = new EventEmitter<TransactionStripped | void>();
 
   @ViewChild('blockGraph') blockGraph: BlockOverviewGraphComponent;
 
   lastBlockHeight: number;
   blockIndex: number;
-  isLoading$ = new BehaviorSubject<boolean>(true);
+  isLoading$ = new BehaviorSubject<boolean>(false);
   timeLtrSubscription: Subscription;
   timeLtr: boolean;
   chainDirection: string = 'right';
   poolDirection: string = 'left';
 
   blockSub: Subscription;
-  rateLimit = 1000;
-  private lastEventTime = Date.now() - this.rateLimit;
-  private subId = 0;
-
   firstLoad: boolean = true;
 
   constructor(
@@ -60,39 +57,13 @@ export class MempoolBlockOverviewComponent implements OnInit, OnDestroy, OnChang
   }
 
   ngAfterViewInit(): void {
-    this.blockSub = merge(
-      this.stateService.mempoolBlockTransactions$,
-      this.stateService.mempoolBlockDelta$,
-    ).pipe(
-      concatMap(update => {
-        const now = Date.now();
-        const timeSinceLastEvent = now - this.lastEventTime;
-        this.lastEventTime = Math.max(now, this.lastEventTime + this.rateLimit);
-
-        const subId = this.subId;
-
-        // If time since last event is less than X seconds, delay this event
-        if (timeSinceLastEvent < this.rateLimit) {
-          return timer(this.rateLimit - timeSinceLastEvent).pipe(
-            // Emit the event after the timer
-            map(() => ({ update, subId }))
-          );
-        } else {
-          // If enough time has passed, emit the event immediately
-          return of({ update, subId });
-        }
-      })
-    ).subscribe(({ update, subId }) => {
-      // discard stale updates after a block transition
-      if (subId !== this.subId) {
-        return;
-      }
+    this.blockSub = this.stateService.mempoolBlockUpdate$.subscribe((update) => {
       // process update
-      if (update['added']) {
+      if (isMempoolDelta(update)) {
         // delta
-        this.updateBlock(update as MempoolBlockDelta);
+        this.updateBlock(update);
       } else {
-        const transactionsStripped = update as TransactionStripped[];
+        const transactionsStripped = update.transactions;
         // new transactions
         if (this.firstLoad) {
           this.replaceBlock(transactionsStripped);
@@ -124,6 +95,7 @@ export class MempoolBlockOverviewComponent implements OnInit, OnDestroy, OnChang
             }
           }
           this.updateBlock({
+            block: this.blockIndex,
             removed,
             changed,
             added
@@ -135,17 +107,20 @@ export class MempoolBlockOverviewComponent implements OnInit, OnDestroy, OnChang
 
   ngOnChanges(changes): void {
     if (changes.index) {
-      this.subId++;
       this.firstLoad = true;
       if (this.blockGraph) {
         this.blockGraph.clear(changes.index.currentValue > changes.index.previousValue ? this.chainDirection : this.poolDirection);
       }
-      this.isLoading$.next(true);
-      this.websocketService.startTrackMempoolBlock(changes.index.currentValue);
+      if (!this.websocketService.startTrackMempoolBlock(changes.index.currentValue) && this.stateService.mempoolBlockState && this.stateService.mempoolBlockState.block === changes.index.currentValue) {
+        this.resumeBlock(Object.values(this.stateService.mempoolBlockState.transactions));
+      } else {
+        this.isLoading$.next(true);
+      }
     }
   }
 
   ngOnDestroy(): void {
+    this.blockGraph?.destroy();
     this.blockSub.unsubscribe();
     this.timeLtrSubscription.unsubscribe();
     this.websocketService.stopTrackMempoolBlock();
@@ -171,12 +146,29 @@ export class MempoolBlockOverviewComponent implements OnInit, OnDestroy, OnChang
       const direction = (this.blockIndex == null || this.index < this.blockIndex) ? this.poolDirection : this.chainDirection;
       this.blockGraph.replace(delta.added, direction);
     } else {
-      this.blockGraph.update(delta.added, delta.removed, delta.changed || [], blockMined ? this.chainDirection : this.poolDirection, blockMined);
+      if (blockMined) {
+        this.blockGraph.update(delta.added, delta.removed, delta.changed || [], blockMined ? this.chainDirection : this.poolDirection, blockMined);
+      } else {
+        this.blockGraph.deferredUpdate(delta.added, delta.removed, delta.changed || [], this.poolDirection);
+      }
     }
 
     this.lastBlockHeight = this.stateService.latestBlockHeight;
     this.blockIndex = this.index;
     this.isLoading$.next(false);
+  }
+
+  resumeBlock(transactionsStripped: TransactionStripped[]): void {
+    if (this.blockGraph) {
+      this.firstLoad = false;
+      this.blockGraph.setup(transactionsStripped, true);
+      this.blockIndex = this.index;
+      this.isLoading$.next(false);
+    } else {
+      requestAnimationFrame(() => {
+        this.resumeBlock(transactionsStripped);
+      });
+    }
   }
 
   onTxClick(event: { tx: TransactionStripped, keyModifier: boolean }): void {

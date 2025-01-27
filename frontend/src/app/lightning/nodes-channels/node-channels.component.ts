@@ -1,13 +1,13 @@
 import { formatNumber } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Inject, Input, LOCALE_ID, NgZone, OnChanges } from '@angular/core';
 import { Router } from '@angular/router';
-import { EChartsOption, TreemapSeriesOption } from '../../graphs/echarts';
+import { EChartsOption, TreemapSeriesOption } from '@app/graphs/echarts';
 import { Observable, share, switchMap, tap } from 'rxjs';
-import { lerpColor } from '../../shared/graphs.utils';
-import { AmountShortenerPipe } from '../../shared/pipes/amount-shortener.pipe';
-import { LightningApiService } from '../lightning-api.service';
-import { RelativeUrlPipe } from '../../shared/pipes/relative-url/relative-url.pipe';
-import { StateService } from '../../services/state.service';
+import { lerpColor } from '@app/shared/graphs.utils';
+import { AmountShortenerPipe } from '@app/shared/pipes/amount-shortener.pipe';
+import { LightningApiService } from '@app/lightning/lightning-api.service';
+import { RelativeUrlPipe } from '@app/shared/pipes/relative-url/relative-url.pipe';
+import { StateService } from '@app/services/state.service';
 
 @Component({
   selector: 'app-node-channels',
@@ -33,7 +33,7 @@ export class NodeChannels implements OnChanges {
     private amountShortenerPipe: AmountShortenerPipe,
     private zone: NgZone,
     private router: Router,
-    private stateService: StateService,
+    public stateService: StateService,
   ) {}
 
   ngOnChanges(): void {
@@ -96,7 +96,7 @@ export class NodeChannels implements OnChanges {
             borderRadius: 4,
             shadowColor: 'rgba(0, 0, 0, 0.5)',
             textStyle: {
-              color: '#b1b1b1',
+              color: 'var(--tooltip-grey)',
             },
             borderColor: '#000',
             formatter: (value): string => {

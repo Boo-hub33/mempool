@@ -1,15 +1,15 @@
 import { ChangeDetectionStrategy, Component, Inject, Input, Output, EventEmitter, LOCALE_ID, NgZone, OnDestroy, OnInit, OnChanges } from '@angular/core';
-import { SeoService } from '../../services/seo.service';
-import { ApiService } from '../../services/api.service';
+import { SeoService } from '@app/services/seo.service';
+import { ApiService } from '@app/services/api.service';
 import { Observable, BehaviorSubject, switchMap, tap, combineLatest } from 'rxjs';
-import { AssetsService } from '../../services/assets.service';
-import { EChartsOption, echarts } from '../../graphs/echarts';
-import { lerpColor } from '../../shared/graphs.utils';
+import { AssetsService } from '@app/services/assets.service';
+import { EChartsOption, echarts } from '@app/graphs/echarts';
+import { lerpColor } from '@app/shared/graphs.utils';
 import { Router } from '@angular/router';
-import { RelativeUrlPipe } from '../../shared/pipes/relative-url/relative-url.pipe';
-import { StateService } from '../../services/state.service';
-import { AmountShortenerPipe } from '../../shared/pipes/amount-shortener.pipe';
-import { getFlagEmoji } from '../../shared/common.utils';
+import { RelativeUrlPipe } from '@app/shared/pipes/relative-url/relative-url.pipe';
+import { StateService } from '@app/services/state.service';
+import { AmountShortenerPipe } from '@app/shared/pipes/amount-shortener.pipe';
+import { getFlagEmoji } from '@app/shared/common.utils';
 
 @Component({
   selector: 'app-nodes-map',
@@ -26,6 +26,7 @@ export class NodesMap implements OnInit, OnChanges {
   inputNodes$: BehaviorSubject<any>;
   nodes$: Observable<any>;
   observable$: Observable<any>;
+  isLoading: boolean = true;
 
   chartInstance = undefined;
   chartOptions: EChartsOption = {};
@@ -37,7 +38,7 @@ export class NodesMap implements OnInit, OnChanges {
     @Inject(LOCALE_ID) public locale: string,
     private seoService: SeoService,
     private apiService: ApiService,
-    private stateService: StateService,
+    public stateService: StateService,
     private assetsService: AssetsService,
     private router: Router,
     private zone: NgZone,
@@ -195,7 +196,7 @@ export class NodesMap implements OnInit, OnChanges {
             borderRadius: 0,
             shadowColor: 'rgba(0, 0, 0, 0.5)',
             textStyle: {
-              color: '#b1b1b1',
+              color: 'var(--tooltip-grey)',
               align: 'left',
             },
             borderColor: '#000',
@@ -226,6 +227,7 @@ export class NodesMap implements OnInit, OnChanges {
         },
       ]
     };
+    this.isLoading = false;
   }
 
   onChartInit(ec) {
@@ -234,6 +236,10 @@ export class NodesMap implements OnInit, OnChanges {
     }
 
     this.chartInstance = ec;
+
+    this.chartInstance.on('finished', () => {
+      this.isLoading = false;
+    });
 
     this.chartInstance.on('click', (e) => {
       if (e.data) {

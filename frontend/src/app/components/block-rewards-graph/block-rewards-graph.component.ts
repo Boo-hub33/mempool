@@ -1,17 +1,18 @@
 import { ChangeDetectionStrategy, Component, Inject, Input, LOCALE_ID, OnInit } from '@angular/core';
-import { echarts, EChartsOption } from '../../graphs/echarts';
+import { echarts, EChartsOption } from '@app/graphs/echarts';
 import { Observable } from 'rxjs';
 import { map, share, startWith, switchMap, tap } from 'rxjs/operators';
-import { ApiService } from '../../services/api.service';
-import { SeoService } from '../../services/seo.service';
+import { ApiService } from '@app/services/api.service';
+import { SeoService } from '@app/services/seo.service';
 import { formatNumber } from '@angular/common';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
-import { download, formatterXAxis } from '../../shared/graphs.utils';
-import { MiningService } from '../../services/mining.service';
-import { StorageService } from '../../services/storage.service';
+import { download, formatterXAxis } from '@app/shared/graphs.utils';
+import { MiningService } from '@app/services/mining.service';
+import { StorageService } from '@app/services/storage.service';
 import { ActivatedRoute } from '@angular/router';
-import { FiatShortenerPipe } from '../../shared/pipes/fiat-shortener.pipe';
-import { FiatCurrencyPipe } from '../../shared/pipes/fiat-currency.pipe';
+import { FiatShortenerPipe } from '@app/shared/pipes/fiat-shortener.pipe';
+import { FiatCurrencyPipe } from '@app/shared/pipes/fiat-currency.pipe';
+import { StateService } from '@app/services/state.service';
 
 @Component({
   selector: 'app-block-rewards-graph',
@@ -22,7 +23,7 @@ import { FiatCurrencyPipe } from '../../shared/pipes/fiat-currency.pipe';
       position: absolute;
       top: 50%;
       left: calc(50% - 15px);
-      z-index: 100;
+      z-index: 99;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -54,6 +55,7 @@ export class BlockRewardsGraphComponent implements OnInit {
     private formBuilder: UntypedFormBuilder,
     private miningService: MiningService,
     private storageService: StorageService,
+    public stateService: StateService,
     private route: ActivatedRoute,
     private fiatShortenerPipe: FiatShortenerPipe,
     private fiatCurrencyPipe: FiatCurrencyPipe,
@@ -148,7 +150,7 @@ export class BlockRewardsGraphComponent implements OnInit {
         borderRadius: 4,
         shadowColor: 'rgba(0, 0, 0, 0.5)',
         textStyle: {
-          color: '#b1b1b1',
+          color: 'var(--tooltip-grey)',
           align: 'left',
         },
         borderColor: '#000',
@@ -217,7 +219,7 @@ export class BlockRewardsGraphComponent implements OnInit {
           splitLine: {
             lineStyle: {
               type: 'dotted',
-              color: '#ffffff66',
+              color: 'var(--transparent-fg)',
               opacity: 0.25,
             }
           },
@@ -313,7 +315,7 @@ export class BlockRewardsGraphComponent implements OnInit {
     const now = new Date();
     // @ts-ignore
     this.chartOptions.grid.bottom = 40;
-    this.chartOptions.backgroundColor = '#11131f';
+    this.chartOptions.backgroundColor = 'var(--active-bg)';
     this.chartInstance.setOption(this.chartOptions);
     download(this.chartInstance.getDataURL({
       pixelRatio: 2,

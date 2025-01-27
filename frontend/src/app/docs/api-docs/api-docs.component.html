@@ -19,7 +19,7 @@
           <div *ngIf="!item.hasOwnProperty('options') || ( item.hasOwnProperty('options') && item.options.hasOwnProperty('officialOnly') && item.options.officialOnly && officialMempoolInstance ) || ( item.hasOwnProperty('options') && item.options.hasOwnProperty('auditOnly') && item.options.auditOnly && auditEnabled )">
             <h3 *ngIf="item.type === 'category'">{{ item.title }}</h3>
             <div *ngIf="item.type !== 'category'" class="endpoint-container" id="{{ item.fragment }}">
-              <a id="{{ item.fragment + '-tab-header' }}" class="section-header" (click)="anchorLinkClick( $event )" [routerLink]="['./']" fragment="{{ item.fragment }}"><table><tr><td>{{ item.title }}</td><td><span>{{ item.category }}</span></td></tr></table></a>
+              <a id="{{ item.fragment + '-tab-header' }}" class="section-header" (click)="anchorLinkClick({event: $event, fragment: item.fragment})"><table><tr><td>{{ item.title }}</td><td><span>{{ item.category }}</span></td></tr></table></a>
               <div class="endpoint-content">
                 <ng-container *ngTemplateOutlet="dict[item.fragment]" class="endpoint"></ng-container>
               </div>
@@ -39,7 +39,7 @@
 
       <div class="doc-content">
 
-        <div id="enterprise-cta-mobile" *ngIf="showMobileEnterpriseUpsell">
+        <div id="enterprise-cta-mobile" *ngIf="officialMempoolInstance && showMobileEnterpriseUpsell">
           <p>Get higher API limits with <span class="no-line-break">Mempool Enterprise®</span></p>
           <div class="button-group">
             <a class="btn btn-small btn-secondary" (click)="showMobileEnterpriseUpsell = false">No Thanks</a>
@@ -54,7 +54,7 @@
           <div *ngIf="!item.hasOwnProperty('options') || ( item.hasOwnProperty('options') && item.options.hasOwnProperty('officialOnly') && item.options.officialOnly && officialMempoolInstance )">
             <h3 *ngIf="( item.type === 'category' ) && ( item.showConditions.indexOf(network.val) > -1 )">{{ item.title }}</h3>
             <div *ngIf="( item.type !== 'category' ) && ( item.showConditions.indexOf(network.val) > -1 )" class="endpoint-container" id="{{ item.fragment }}">
-              <a id="{{ item.fragment + '-tab-header' }}" class="section-header" (click)="anchorLinkClick( $event )" [routerLink]="['./']" fragment="{{ item.fragment }}">{{ item.title }} <span>{{ item.category }}</span></a>
+              <a id="{{ item.fragment + '-tab-header' }}" class="section-header" (click)="anchorLinkClick({event: $event, fragment: item.fragment})">{{ item.title }} <span>{{ item.category }}</span></a>
               <div class="endpoint-content">
                 <div class="endpoint">
                   <div class="subtitle" i18n="Api docs endpoint">Endpoint</div>
@@ -108,18 +108,43 @@
       </div>
     </div>
 
-    <div id="websocketAPI" *ngIf="( whichTab === 'websocket' ) && ( network.val !== 'bisq' )">
-      <div class="api-category">
-        <div class="websocket">
-          <div class="endpoint">
-            <div class="subtitle" i18n="Api docs endpoint">Endpoint</div>
-            {{ wrapUrl(network.val, wsDocs, true) }}
+    <div id="websocketAPI" *ngIf="whichTab === 'websocket'">
+
+      <div id="doc-nav-desktop" class="hide-on-mobile" [ngClass]="desktopDocsNavPosition">
+        <app-api-docs-nav (navLinkClickEvent)="anchorLinkClick( $event )" [network]="{ val: network$ | async }" [whichTab]="whichTab"></app-api-docs-nav>
+      </div>
+
+      <div class="doc-content">
+
+        <div id="enterprise-cta-mobile" *ngIf="officialMempoolInstance && showMobileEnterpriseUpsell">
+          <p>Get higher API limits with <span class="no-line-break">Mempool Enterprise®</span></p>
+          <div class="button-group">
+            <a class="btn btn-small btn-secondary" (click)="showMobileEnterpriseUpsell = false">No Thanks</a>
+            <a class="btn btn-small btn-purple" href="https://mempool.space/enterprise">More Info <fa-icon [icon]="['fas', 'angle-right']" [styles]="{'font-size': '12px'}"></fa-icon></a>
           </div>
-          <div class="description">
-            <div class="subtitle" i18n>Description</div>
-            <div i18n="api-docs.websocket.websocket">Default push: <code>{{ '{' }} action: 'want', data: ['blocks', ...] {{ '}' }}</code> to express what you want pushed. Available: <code>blocks</code>, <code>mempool-blocks</code>, <code>live-2h-chart</code>, and <code>stats</code>.<br><br>Push transactions related to address: <code>{{ '{' }} 'track-address': '3PbJ...bF9B' {{ '}' }}</code> to receive all new transactions containing that address as input or output. Returns an array of transactions. <code>address-transactions</code> for new mempool transactions, and <code>block-transactions</code> for new block confirmed transactions.</div>
+        </div>
+
+        <p class="doc-welcome-note">Below is a reference for the {{ network.val === '' ? 'Bitcoin' : network.val.charAt(0).toUpperCase() + network.val.slice(1) }} <ng-container i18n="api-docs.title-websocket">Websocket service</ng-container> running at {{ websocketUrl(network.val) }}.</p>
+        <p class="doc-welcome-note api-note" *ngIf="officialMempoolInstance">Note that usage limits apply to our WebSocket API. Consider an <a href="https://mempool.space/enterprise">enterprise sponsorship</a> if you need higher API limits, such as higher tracking limits.</p>
+
+        <div class="doc-item-container" *ngFor="let item of wsDocs">
+          <div *ngIf="!item.hasOwnProperty('options') || ( item.hasOwnProperty('options') && item.options.hasOwnProperty('officialOnly') && item.options.officialOnly && officialMempoolInstance )">
+            <h3 *ngIf="( item.type === 'category' ) && ( item.showConditions.indexOf(network.val) > -1 )">{{ item.title }}</h3>
+            <div *ngIf="( item.type !== 'category' ) && ( item.showConditions.indexOf(network.val) > -1 )" class="endpoint-container" id="{{ item.fragment }}">
+              <a id="{{ item.fragment + '-tab-header' }}" class="section-header" (click)="anchorLinkClick({event: $event, fragment: item.fragment})">{{ item.title }} <span>{{ item.category }}</span></a>
+              <div class="endpoint-content">
+                <div class="description">
+                  <div class="subtitle" i18n>Description</div>
+                  <div [innerHTML]="item.description.default" i18n></div>
+                </div>
+                <div class="description">
+                  <div class="subtitle" i18n>Payload</div>
+                  <pre><code [innerText]="item.payload"></code></pre>
+                </div>
+                <app-code-template [hostname]="hostname" [baseNetworkUrl]="baseNetworkUrl" [method]="item.httpRequestMethod" [code]="item.codeExample.default" [network]="network.val" [showCodeExample]="item.showJsExamples"></app-code-template>
+              </div>
+            </div>
           </div>
-          <app-code-template [method]="'websocket'" [hostname]="hostname" [code]="wsDocs" [network]="network.val" [showCodeExample]="wsDocs.showJsExamples"></app-code-template>
         </div>
       </div>
     </div>
@@ -133,7 +158,7 @@
           <p>{{electrsPort}}</p>
           <p class="subtitle">SSL</p>
           <p>Enabled</p>
-          <p class="note" *ngIf="network.val !== 'signet'">Electrum RPC interface for Bitcoin Signet is <a href="/signet/docs/api/electrs">publicly available</a>. Electrum RPC interface for all other networks is available to <a href='https://mempool.space/enterprise'>sponsors</a> only—whitelisting is required.</p>
+          <p class="note" *ngIf="network.val !== 'signet' && network.val !== 'testnet4'">Electrum RPC interface for <a href="/signet/docs/api/electrs">Bitcoin Signet</a> and <a href="/testnet4/docs/api/electrs">Bitcoin Testnet4</a> is publicly available. Electrum RPC interface for all other networks is available to <a href='https://mempool.space/enterprise'>sponsors</a> only—whitelisting is required.</p>
         </div>
       </div>
     </div>
@@ -190,11 +215,11 @@
 </ng-template>
 
 <ng-template type="why-is-transaction-stuck-in-mempool">
-  <p>If it's been a while and your transaction hasn't confirmed, your transaction is probably using a lower feerate relative to other transactions currently in the mempool. Depending on how you made your transaction, there may be <a [routerLink]="['/docs/faq' | relativeUrl]" fragment="how-to-get-transaction-confirmed-quickly">ways to accelerate the process</a>.</p><p>There's no need to panic—a Bitcoin transaction will always either confirm completely (or not at all) at some point. As long as you have your transaction's ID, you can always see where your funds are.</p><p style='font-weight:700'>This site only provides data about the Bitcoin network—it cannot help you get your transaction confirmed quicker.</p>
+  <p>If it's been a while and your transaction hasn't confirmed, your transaction is probably using a lower feerate relative to other transactions currently in the mempool. Depending on how you made your transaction, there may be <a [routerLink]="['/docs/faq' | relativeUrl]" fragment="how-to-get-transaction-confirmed-quickly">ways to accelerate the process</a>.</p><p>There's no need to panic—a Bitcoin transaction will always either confirm completely (or not at all) at some point. As long as you have your transaction's ID, you can always see where your funds are.</p><p>This site only provides data about the Bitcoin network. To get help with a transaction, get in touch with the entity that helped make the transaction (wallet software, exchange company, etc).</p>
 </ng-template>
 
 <ng-template type="how-to-get-transaction-confirmed-quickly">
-  <p>To get your transaction confirmed quicker, you will need to increase its effective feerate.</p><p>If your transaction was created with RBF enabled, your stuck transaction can simply be replaced with a new one that has a higher fee.</p><p>Otherwise, if you control any of the stuck transaction's outputs, you can use CPFP to increase your stuck transaction's effective feerate.</p><p>If you are not sure how to do RBF or CPFP, work with the tool you used to make the transaction (wallet software, exchange company, etc). This website only provides data about the Bitcoin network, so there is nothing it can do to help you get your transaction confirmed quicker.</p>
+  <p>To get your transaction confirmed quicker, you will need to increase its effective feerate.</p><p>If your transaction was created with RBF enabled, your stuck transaction can simply be replaced with a new one that has a higher fee. Otherwise, if you control any of the stuck transaction's outputs, you can use CPFP to increase your stuck transaction's effective feerate.</p><p>If you are not sure how to do RBF or CPFP, work with the tool you used to make the transaction (wallet software, exchange company, etc).</p><p>Another option to get your transaction confirmed more quickly is <a [href]="[ isMempoolSpaceBuild ? '/accelerator' : 'https://mempool.space/accelerator']" [target]="isMempoolSpaceBuild ? '' : 'blank'">Mempool Accelerator™</a>.</p>
 </ng-template>
 
 <ng-template type="how-prevent-stuck-transaction">
@@ -238,7 +263,7 @@
 </ng-template>
 
 <ng-template type="why-empty-blocks">
-  <p>When a new block is found, mining pools send miners a block template with no transactions so they can start searching for the next block as soon as possible. They send a block template full of transactions right afterward, but a full block template is a bigger data transfer and takes slightly longer to reach miners.</p><p>In this intervening time, which is usually no more than 1-2 seconds, miners sometimes get lucky and find a new block using the empty block template.</p>
+  <p>When a new block is found, mining pools often send miners new block templates prior to fully validating the new block, often before they've even received the new block. During this time, it is not possible to select transactions for the next block as a pool isn't sure which transactions conflict with transactions already mined.</p><p>While empty blocks do not add additional transactions to the blockchain, they do contribute to the overall security of transactions already in the chain.</p>
 </ng-template>
 
 <ng-template type="why-block-timestamps-dont-always-increase">
@@ -290,8 +315,8 @@
 </ng-template>
 
 <ng-template type="how-do-mempool-goggles-work">
-  <p>Mempool Goggles are a set of filters that can be applied to the <a [routerLink]="['/mempool-block/0' | relativeUrl]">mempool block visualizations</a> to highlight different types of transactions.</p>
-  <p>There are currently 25 different Mempool Goggles filters, grouped into six categories:</p>
+  <p>Mempool Goggles&trade; are a set of filters that can be applied to the <a [routerLink]="['/mempool-block/0' | relativeUrl]">mempool block visualizations</a> to highlight different types of transactions.</p>
+  <p>There are currently 25 different Mempool Goggles&trade; filters, grouped into six categories:</p>
   <dl>
     <dt>Features</dt>
     <dd>
@@ -386,7 +411,7 @@
 
 <ng-template type="what-is-adjusted-vsize">
   <p>Bitcoin blocks have two independent consensus-enforced resource constraints - a 4MWU weight limit, and the 80,000 sigop limit.</p>
-  <p>Most transactions use a more of the weight limit than the sigop limit. However, some transactions use a disproportionate number of sigops compared to their weight.</p>
+  <p>Most transactions use more of the weight limit than the sigop limit. However, some transactions use a disproportionate number of sigops compared to their weight.</p>
   <p>To account for this, Bitcoin Core calculates and uses an "adjusted vsize" equal 5 times the number of sigops, or the unadjusted vsize, whichever is larger.</p>
   <p>Then, during block template construction, Bitcoin Core selects transactions in descending order of fee rate measured in satoshis per <i>adjusted vsize</i></p>
   <p>On mempool.space, effective fee rates for unconfirmed transactions are also measured in terms of satoshis per adjusted vsize, after accounting for CPFP relationships and other dependencies.</p>
@@ -418,5 +443,5 @@
 </ng-template>
 
 <ng-template type="address-lookup-issues">
-  <p>If you're getting errors when doing address lookups, it's probably because of your Electrum server backend.</p><p>Mempool uses an Electrum server to do address lookups. There are several implementations of the Electrum server protocol, and Mempool can use any of them, but the implementation you use affects performance:</p><ol><li><a href="https://github.com/romanz/electrs" target="_blank">romanz/electrs</a>. This is a common choice for its low resource requirements, and most full-node distros use it. But while this implementation works great for basic queries, it will struggle with heavier ones (e.g. looking up addresses with many transactions)—especially when running on low-power hardware like a Raspberry Pi.</li><li><a href="https://github.com/cculianu/Fulcrum" target="_blank">Fulcrum</a>. Fulcrum requires more resources than romanz/electrs but it can still run on a Raspberry Pi, and it handles heavy queries much more efficiently. If you're having issues with romanz/electrs, Fulcrum is worth a try.</li><li><a href="https://github.com/Blockstream/electrs" target="_blank">blockstream/electrs</a>. If you have stronger hardware, consider running Blockstream's electrs implementation. It's the backend mempool.space uses, and is also what powers blockstream.info.</li></ol>
+  <p>If you're getting errors when doing address lookups, it's probably because of your Electrum server backend.</p><p>Mempool uses an Electrum server to do address lookups. There are several implementations of the Electrum server protocol, and Mempool can use any of them, but the implementation you use affects performance:</p><ol><li><a href="https://github.com/romanz/electrs" target="_blank">romanz/electrs</a>. This is a common choice for its low resource requirements, and most full-node distros use it. But while this implementation works great for basic queries, it will struggle with heavier ones (e.g. looking up addresses with many transactions)—especially when running on low-power hardware like a Raspberry Pi.</li><li><a href="https://github.com/cculianu/Fulcrum" target="_blank">Fulcrum</a>. Fulcrum requires more resources than romanz/electrs but it can still run on a Raspberry Pi, and it handles heavy queries much more efficiently. If you're having issues with romanz/electrs, Fulcrum is worth a try.</li><li><a href="https://github.com/mempool/electrs" target="_blank">mempool/electrs</a>. If you have stronger hardware, you could consider running mempool/electrs, the backend that powers mempool.space. It's a fork of Blockstream's Esplora, which is in turn a fork of romanz/electrs, intended for maximum performance and larger-scale deployments.</li></ol>
 </ng-template>

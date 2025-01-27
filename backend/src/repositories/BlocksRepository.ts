@@ -5,7 +5,7 @@ import logger from '../logger';
 import { Common } from '../api/common';
 import PoolsRepository from './PoolsRepository';
 import HashratesRepository from './HashratesRepository';
-import { RowDataPacket, escape } from 'mysql2';
+import { RowDataPacket } from 'mysql2';
 import BlocksSummariesRepository from './BlocksSummariesRepository';
 import DifficultyAdjustmentsRepository from './DifficultyAdjustmentsRepository';
 import bitcoinClient from '../api/bitcoin/bitcoin-client';
@@ -14,6 +14,8 @@ import chainTips from '../api/chain-tips';
 import blocks from '../api/blocks';
 import BlocksAuditsRepository from './BlocksAuditsRepository';
 import transactionUtils from '../api/transaction-utils';
+import { parseDATUMTemplateCreator } from '../utils/bitcoin-script';
+import poolsUpdater from '../tasks/pools-updater';
 
 interface DatabaseBlock {
   id: string;
@@ -40,6 +42,7 @@ interface DatabaseBlock {
   avgFeeRate: number;
   coinbaseRaw: string;
   coinbaseAddress: string;
+  coinbaseAddresses: string;
   coinbaseSignature: string;
   coinbaseSignatureAscii: string;
   avgTxSize: number;
@@ -55,6 +58,7 @@ interface DatabaseBlock {
   utxoSetChange: number;
   utxoSetSize: number;
   totalInputAmt: number;
+  firstSeen: number;
 }
 
 const BLOCK_DB_FIELDS = `
@@ -82,6 +86,7 @@ const BLOCK_DB_FIELDS = `
   blocks.avg_fee_rate AS avgFeeRate,
   blocks.coinbase_raw AS coinbaseRaw,
   blocks.coinbase_address AS coinbaseAddress,
+  blocks.coinbase_addresses AS coinbaseAddresses,
   blocks.coinbase_signature AS coinbaseSignature,
   blocks.coinbase_signature_ascii AS coinbaseSignatureAscii,
   blocks.avg_tx_size AS avgTxSize,
@@ -96,7 +101,8 @@ const BLOCK_DB_FIELDS = `
   blocks.header,
   blocks.utxoset_change AS utxoSetChange,
   blocks.utxoset_size AS utxoSetSize,
-  blocks.total_input_amt AS totalInputAmt
+  blocks.total_input_amt AS totalInputAmt,
+  UNIX_TIMESTAMP(blocks.first_seen) AS firstSeen
 `;
 
 class BlocksRepository {
@@ -109,27 +115,27 @@ class BlocksRepository {
 
     try {
       const query = `INSERT INTO blocks(
-        height,             hash,                blockTimestamp,    size,
-        weight,             tx_count,            coinbase_raw,      difficulty,
-        pool_id,            fees,                fee_span,          median_fee,
-        reward,             version,             bits,              nonce,
-        merkle_root,        previous_block_hash, avg_fee,           avg_fee_rate,
-        median_timestamp,   header,              coinbase_address,
-        coinbase_signature, utxoset_size,        utxoset_change,    avg_tx_size,
-        total_inputs,       total_outputs,       total_input_amt,   total_output_amt,
-        fee_percentiles,    segwit_total_txs,    segwit_total_size, segwit_total_weight,
-        median_fee_amt,     coinbase_signature_ascii
+        height,             hash,                     blockTimestamp,    size,
+        weight,             tx_count,                 coinbase_raw,      difficulty,
+        pool_id,            fees,                     fee_span,          median_fee,
+        reward,             version,                  bits,              nonce,
+        merkle_root,        previous_block_hash,      avg_fee,           avg_fee_rate,
+        median_timestamp,   header,                   coinbase_address,  coinbase_addresses,
+        coinbase_signature, utxoset_size,             utxoset_change,    avg_tx_size,
+        total_inputs,       total_outputs,            total_input_amt,   total_output_amt,
+        fee_percentiles,    segwit_total_txs,         segwit_total_size, segwit_total_weight,
+        median_fee_amt,     coinbase_signature_ascii, definition_hash
       ) VALUE (
         ?, ?, FROM_UNIXTIME(?), ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
-        FROM_UNIXTIME(?), ?, ?,
+        FROM_UNIXTIME(?), ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
-        ?, ?
+        ?, ?, ?
       )`;
 
       const poolDbId = await PoolsRepository.$getPoolByUniqueId(block.extras.pool.id);
@@ -161,6 +167,7 @@ class BlocksRepository {
         block.mediantime,
         block.extras.header,
         block.extras.coinbaseAddress,
+        block.extras.coinbaseAddresses ? JSON.stringify(block.extras.coinbaseAddresses) : null,
         truncatedCoinbaseSignature,
         block.extras.utxoSetSize,
         block.extras.utxoSetChange,
@@ -175,6 +182,7 @@ class BlocksRepository {
         block.extras.segwitTotalWeight,
         block.extras.medianFeeAmt,
         truncatedCoinbaseSignatureAscii,
+        poolsUpdater.currentSha
       ];
 
       await DB.query(query, params);
@@ -495,7 +503,7 @@ class BlocksRepository {
     }
 
     query += ` ORDER BY height DESC
-      LIMIT 10`;
+      LIMIT 100`;
 
     try {
       const [rows]: any[] = await DB.query(query, params);
@@ -529,7 +537,7 @@ class BlocksRepository {
         return null;
       }
 
-      return await this.formatDbBlockIntoExtendedBlock(rows[0] as DatabaseBlock);  
+      return await this.formatDbBlockIntoExtendedBlock(rows[0] as DatabaseBlock);
     } catch (e) {
       logger.err(`Cannot get indexed block ${height}. Reason: ` + (e instanceof Error ? e.message : e));
       throw e;
@@ -663,7 +671,7 @@ class BlocksRepository {
   /**
    * Get the historical averaged block fees
    */
-  public async $getHistoricalBlockFees(div: number, interval: string | null): Promise<any> {
+  public async $getHistoricalBlockFees(div: number, interval: string | null, timespan?: {from: number, to: number}): Promise<any> {
     try {
       let query = `SELECT
         CAST(AVG(blocks.height) as INT) as avgHeight,
@@ -677,6 +685,8 @@ class BlocksRepository {
 
       if (interval !== null) {
         query += ` WHERE blockTimestamp BETWEEN DATE_SUB(NOW(), INTERVAL ${interval}) AND NOW()`;
+      } else if (timespan) {
+        query += ` WHERE blockTimestamp BETWEEN FROM_UNIXTIME(${timespan.from}) AND FROM_UNIXTIME(${timespan.to})`;
       }
 
       query += ` GROUP BY UNIX_TIMESTAMP(blockTimestamp) DIV ${div}`;
@@ -921,6 +931,25 @@ class BlocksRepository {
   }
 
   /**
+   * Get all indexed blocks with missing coinbase addresses
+   */
+  public async $getBlocksWithoutCoinbaseAddresses(): Promise<any> {
+    try {
+      const [blocks] = await DB.query(`
+        SELECT height, hash, coinbase_addresses
+        FROM blocks
+        WHERE coinbase_addresses IS NULL AND
+          coinbase_address IS NOT NULL
+        ORDER BY height DESC
+      `);
+      return blocks;
+    } catch (e) {
+      logger.err(`Cannot get blocks with missing coinbase addresses. Reason: ` + (e instanceof Error ? e.message : e));
+      return [];
+    }
+  }
+
+  /**
    * Save indexed median fee to avoid recomputing it later
    * 
    * @param id 
@@ -959,6 +988,62 @@ class BlocksRepository {
   }
 
   /**
+   * Save coinbase addresses
+   * 
+   * @param id
+   * @param addresses
+   */
+  public async $saveCoinbaseAddresses(id: string, addresses: string[]): Promise<void> {
+    try {
+      await DB.query(`
+        UPDATE blocks SET coinbase_addresses = ?
+        WHERE hash = ?`,
+        [JSON.stringify(addresses), id]
+      );
+    } catch (e) {
+      logger.err(`Cannot update block coinbase addresses. Reason: ` + (e instanceof Error ? e.message : e));
+      throw e;
+    }
+  }
+
+  /**
+   * Save pool
+   * 
+   * @param id
+   * @param poolId
+   */
+  public async $savePool(id: string, poolId: number): Promise<void> {
+    try {
+      await DB.query(`
+        UPDATE blocks SET pool_id = ?, definition_hash = ?
+        WHERE hash = ?`,
+        [poolId, poolsUpdater.currentSha, id]
+      );
+    } catch (e) {
+      logger.err(`Cannot update block pool. Reason: ` + (e instanceof Error ? e.message : e));
+      throw e;
+    }
+  }
+
+  /**
+   * Save block first seen time
+   * 
+   * @param id 
+   */
+  public async $saveFirstSeenTime(id: string, firstSeen: number): Promise<void> {
+    try {
+      await DB.query(`
+        UPDATE blocks SET first_seen = FROM_UNIXTIME(?)
+        WHERE hash = ?`,
+        [firstSeen, id]
+      );
+    } catch (e) {
+      logger.err(`Cannot update block first seen time. Reason: ` + (e instanceof Error ? e.message : e));
+      throw e;
+    }
+  }
+
+  /**
    * Convert a mysql row block into a BlockExtended. Note that you
    * must provide the correct field into dbBlk object param
    * 
@@ -992,11 +1077,13 @@ class BlocksRepository {
       id: dbBlk.poolId,
       name: dbBlk.poolName,
       slug: dbBlk.poolSlug,
+      minerNames: null,
     };
     extras.avgFee = dbBlk.avgFee;
     extras.avgFeeRate = dbBlk.avgFeeRate;
     extras.coinbaseRaw = dbBlk.coinbaseRaw;
     extras.coinbaseAddress = dbBlk.coinbaseAddress;
+    extras.coinbaseAddresses = dbBlk.coinbaseAddresses ? JSON.parse(dbBlk.coinbaseAddresses) : [];
     extras.coinbaseSignature = dbBlk.coinbaseSignature;
     extras.coinbaseSignatureAscii = dbBlk.coinbaseSignatureAscii;
     extras.avgTxSize = dbBlk.avgTxSize;
@@ -1013,6 +1100,7 @@ class BlocksRepository {
     extras.utxoSetSize = dbBlk.utxoSetSize;
     extras.totalInputAmt = dbBlk.totalInputAmt;
     extras.virtualSize = dbBlk.weight / 4.0;
+    extras.firstSeen = dbBlk.firstSeen;
 
     // Re-org can happen after indexing so we need to always get the
     // latest state from core
@@ -1043,7 +1131,7 @@ class BlocksRepository {
         let summaryVersion = 0;
         if (config.MEMPOOL.BACKEND === 'esplora') {
           const txs = (await bitcoinApi.$getTxsForBlock(dbBlk.id)).map(tx => transactionUtils.extendTransaction(tx));
-          summary = blocks.summarizeBlockTransactions(dbBlk.id, txs);
+          summary = blocks.summarizeBlockTransactions(dbBlk.id, dbBlk.height, txs);
           summaryVersion = 1;
         } else {
           // Call Core RPC
@@ -1058,6 +1146,10 @@ class BlocksRepository {
         extras.medianFeeAmt = extras.feePercentiles[3];
         await this.$updateFeeAmounts(dbBlk.id, extras.feePercentiles, extras.medianFeeAmt);
       }
+    }
+
+    if (extras.pool.name === 'OCEAN') {
+      extras.pool.minerNames = parseDATUMTemplateCreator(extras.coinbaseRaw);
     }
 
     blk.extras = <BlockExtension>extras;

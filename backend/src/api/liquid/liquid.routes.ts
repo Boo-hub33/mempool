@@ -3,6 +3,7 @@ import { Application, Request, Response } from 'express';
 import config from '../../config';
 import elementsParser from './elements-parser';
 import icons from './icons';
+import { handleError } from '../../utils/api';
 
 class LiquidRoutes {
   public initRoutes(app: Application) {
@@ -26,6 +27,9 @@ class LiquidRoutes {
         .get(config.MEMPOOL.API_URL_PREFIX + 'liquid/reserves/addresses/total', this.$getFederationAddressesNumber)
         .get(config.MEMPOOL.API_URL_PREFIX + 'liquid/reserves/utxos', this.$getFederationUtxos)
         .get(config.MEMPOOL.API_URL_PREFIX + 'liquid/reserves/utxos/total', this.$getFederationUtxosNumber)
+        .get(config.MEMPOOL.API_URL_PREFIX + 'liquid/reserves/utxos/expired', this.$getExpiredUtxos)
+        .get(config.MEMPOOL.API_URL_PREFIX + 'liquid/reserves/utxos/emergency-spent', this.$getEmergencySpentUtxos)
+        .get(config.MEMPOOL.API_URL_PREFIX + 'liquid/reserves/utxos/emergency-spent/stats', this.$getEmergencySpentUtxosStats)
         .get(config.MEMPOOL.API_URL_PREFIX + 'liquid/reserves/status', this.$getFederationAuditStatus)
         ;
     }
@@ -39,7 +43,7 @@ class LiquidRoutes {
       res.setHeader('content-length', result.length);
       res.send(result);
     } else {
-      res.status(404).send('Asset icon not found');
+      handleError(req, res, 404, 'Asset icon not found');
     }
   }
 
@@ -48,7 +52,7 @@ class LiquidRoutes {
     if (result) {
       res.json(result);
     } else {
-      res.status(404).send('Asset icons not found');
+      handleError(req, res, 404, 'Asset icons not found');
     }
   }
 
@@ -79,7 +83,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 60 * 60).toUTCString());
       res.json(pegs);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get pegs by month');
     }
   }
 
@@ -91,7 +95,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 60 * 60).toUTCString());
       res.json(reserves);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get reserves by month');
     }
   }
 
@@ -103,7 +107,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(currentSupply);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get pegs');
     }
   }
 
@@ -115,7 +119,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(currentReserves);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get reserves');
     }
   }
 
@@ -127,7 +131,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(auditStatus);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get federation audit status');
     }
   }
 
@@ -139,7 +143,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(federationAddresses);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get federation addresses');
     }
   }
 
@@ -151,7 +155,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(federationAddresses);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get federation addresses');
     }
   }
 
@@ -163,7 +167,19 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(federationUtxos);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get federation utxos');
+    }
+  }
+
+  private async $getExpiredUtxos(req: Request, res: Response) {
+    try {
+      const expiredUtxos = await elementsParser.$getExpiredUtxos();
+      res.header('Pragma', 'public');
+      res.header('Cache-control', 'public');
+      res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
+      res.json(expiredUtxos);
+    } catch (e) {
+      handleError(req, res, 500, 'Failed to get expired utxos');
     }
   }
 
@@ -175,7 +191,31 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(federationUtxos);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get federation utxos number');
+    }
+  }
+
+  private async $getEmergencySpentUtxos(req: Request, res: Response) {
+    try {
+      const emergencySpentUtxos = await elementsParser.$getEmergencySpentUtxos();
+      res.header('Pragma', 'public');
+      res.header('Cache-control', 'public');
+      res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
+      res.json(emergencySpentUtxos);
+    } catch (e) {
+      handleError(req, res, 500, 'Failed to get emergency spent utxos');
+    }
+  }
+
+  private async $getEmergencySpentUtxosStats(req: Request, res: Response) {
+    try {
+      const emergencySpentUtxos = await elementsParser.$getEmergencySpentUtxosStats();
+      res.header('Pragma', 'public');
+      res.header('Cache-control', 'public');
+      res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
+      res.json(emergencySpentUtxos);
+    } catch (e) {
+      handleError(req, res, 500, 'Failed to get emergency spent utxos stats');
     }
   }
 
@@ -187,7 +227,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(recentPegs);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get pegs list');
     }
   }
 
@@ -199,7 +239,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(pegsVolume);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get pegs volume daily');
     }
   }
 
@@ -211,7 +251,7 @@ class LiquidRoutes {
       res.setHeader('Expires', new Date(Date.now() + 1000 * 30).toUTCString());
       res.json(pegsCount);
     } catch (e) {
-      res.status(500).send(e instanceof Error ? e.message : e);
+      handleError(req, res, 500, 'Failed to get pegs count');
     }
   }
 

@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, Input, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
-import { StateService } from '../../services/state.service';
+import { StateService } from '@app/services/state.service';
 import { Observable, Subscription } from 'rxjs';
-import { Price } from '../../services/price.service';
+import { Price } from '@app/services/price.service';
 
 @Component({
   selector: 'app-amount',
@@ -12,7 +12,7 @@ import { Price } from '../../services/price.service';
 export class AmountComponent implements OnInit, OnDestroy {
   conversions$: Observable<any>;
   currency: string;
-  viewFiat$: Observable<boolean>;
+  viewAmountMode$: Observable<'btc' | 'sats' | 'fiat'>;
   network = '';
 
   stateSubscription: Subscription;
@@ -24,6 +24,8 @@ export class AmountComponent implements OnInit, OnDestroy {
   @Input() addPlus = false;
   @Input() blockConversion: Price;
   @Input() forceBtc: boolean = false;
+  @Input() ignoreViewMode: boolean = false;
+  @Input() forceBlockConversion: boolean = false; // true = displays fiat price as 0 if blockConversion is undefined instead of falling back to conversions
 
   constructor(
     private stateService: StateService,
@@ -36,7 +38,7 @@ export class AmountComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.viewFiat$ = this.stateService.viewFiat$.asObservable();
+    this.viewAmountMode$ = this.stateService.viewAmountMode$.asObservable();
     this.conversions$ = this.stateService.conversions$.asObservable();
     this.stateSubscription = this.stateService.networkChanged$.subscribe((network) => this.network = network);
   }

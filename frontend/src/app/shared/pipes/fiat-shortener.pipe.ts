@@ -1,7 +1,7 @@
 import { formatCurrency, getCurrencySymbol } from '@angular/common';
 import { Inject, LOCALE_ID, Pipe, PipeTransform } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { StateService } from '../../services/state.service';
+import { StateService } from '@app/services/state.service';
 
 @Pipe({
   name: 'fiatShortener'
@@ -31,7 +31,7 @@ export class FiatShortenerPipe implements PipeTransform {
       { value: 1, symbol: '' },
       { value: 1e3, symbol: 'k' },
       { value: 1e6, symbol: 'M' },
-      { value: 1e9, symbol: 'G' },
+      { value: 1e9, symbol: 'B' },
       { value: 1e12, symbol: 'T' },
       { value: 1e15, symbol: 'P' },
       { value: 1e18, symbol: 'E' }

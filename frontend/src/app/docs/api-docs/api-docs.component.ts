@@ -1,10 +1,10 @@
 import { Component, OnInit, Input, QueryList, AfterViewInit, ViewChildren } from '@angular/core';
-import { Env, StateService } from '../../services/state.service';
+import { Env, StateService } from '@app/services/state.service';
 import { Observable, merge, of, Subject, Subscription } from 'rxjs';
 import { tap, takeUntil } from 'rxjs/operators';
 import { ActivatedRoute } from "@angular/router";
-import { faqData, restApiDocsData, wsApiDocsData } from './api-docs-data';
-import { FaqTemplateDirective } from '../faq-template/faq-template.component';
+import { faqData, restApiDocsData, wsApiDocsData } from '@app/docs/api-docs/api-docs-data';
+import { FaqTemplateDirective } from '@app/docs/faq-template/faq-template.component';
 
 @Component({
   selector: 'app-api-docs',
@@ -33,6 +33,7 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
   showMobileEnterpriseUpsell: boolean = true;
   timeLtrSubscription: Subscription;
   timeLtr: boolean = this.stateService.timeLtr.value;
+  isMempoolSpaceBuild = this.stateService.isMempoolSpaceBuild;
 
   @ViewChildren(FaqTemplateDirective) faqTemplates: QueryList<FaqTemplateDirective>;
   dict = {};
@@ -56,7 +57,10 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
       if( this.route.snapshot.fragment ) {
         this.openEndpointContainer( this.route.snapshot.fragment );
         if (document.getElementById( this.route.snapshot.fragment )) {
-          document.getElementById( this.route.snapshot.fragment ).scrollIntoView();
+          let vOffset = ( window.innerWidth <= 992 ) ? 100 : 60;
+          window.scrollTo({
+            top: document.getElementById( this.route.snapshot.fragment ).offsetTop - vOffset
+          });
         }
       }
       window.addEventListener('scroll', that.onDocScroll, { passive: true });
@@ -69,7 +73,7 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
     this.auditEnabled = this.env.AUDIT;
     this.network$ = merge(of(''), this.stateService.networkChanged$).pipe(
       tap((network: string) => {
-        if (this.env.BASE_MODULE === 'mempool' && network !== '') {
+        if (this.env.BASE_MODULE === 'mempool' && network !== '' && this.env.ROOT_NETWORK === '') {
           this.baseNetworkUrl = `/${network}`;
         } else if (this.env.BASE_MODULE === 'liquid') {
           if (!['', 'liquid'].includes(network)) {
@@ -99,6 +103,8 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
           this.electrsPort = 50002; break;
         case "testnet":
           this.electrsPort = 60002; break;
+        case "testnet4":
+          this.electrsPort = 40002; break;
         case "signet":
           this.electrsPort = 60602; break;
         case "liquid":
@@ -124,20 +130,13 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
     this.desktopDocsNavPosition = ( window.pageYOffset > 115 ) ? "fixed" : "relative";
   }
 
-  anchorLinkClick( event: any ) {
-    let targetId = "";
-    if( event.target.nodeName === "A" ) {
-      targetId = event.target.hash.substring(1);
-    } else {
-      let element = event.target;
-      while( element.nodeName !== "A" ) {
-        element = element.parentElement;
-      }
-      targetId = element.hash.substring(1);
-    }
-    if( this.route.snapshot.fragment === targetId && document.getElementById( targetId )) {
-      document.getElementById( targetId ).scrollIntoView();
-    }
+  anchorLinkClick( e ) {
+    let targetId = e.fragment;
+    let vOffset = ( window.innerWidth <= 992 ) ? 100 : 60;
+    window.scrollTo({
+      top: document.getElementById( targetId ).offsetTop - vOffset
+    });
+    window.history.pushState({}, null, document.location.href.split("#")[0] + "#" + targetId);
     this.openEndpointContainer( targetId );
   }
 
@@ -146,7 +145,7 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
     if (document.getElementById( targetId + "-tab-header" )) {
       tabHeaderHeight = document.getElementById( targetId + "-tab-header" ).scrollHeight;
     }
-    if( ( window.innerWidth <= 992 ) && ( ( this.whichTab === 'rest' ) || ( this.whichTab === 'faq' ) ) && targetId ) {
+    if( ( window.innerWidth <= 992 ) && ( ( this.whichTab === 'rest' ) || ( this.whichTab === 'faq' ) || ( this.whichTab === 'websocket' ) ) && targetId ) {
       const endpointContainerEl = document.querySelector<HTMLElement>( "#" + targetId );
       const endpointContentEl = document.querySelector<HTMLElement>( "#" + targetId + " .endpoint-content" );
       const endPointContentElHeight = endpointContentEl.clientHeight;
@@ -174,6 +173,9 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
     if (network === 'testnet') {
       curlResponse = code.codeSampleTestnet.curl;
     }
+    if (network === 'testnet4') {
+      curlResponse = code.codeSampleTestnet.curl;
+    }
     if (network === 'signet') {
       curlResponse = code.codeSampleSignet.curl;
     }
@@ -183,10 +185,6 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
     if (network === 'liquidtestnet') {
       curlResponse = code.codeSampleLiquidTestnet.curl;
     }
-    if (network === 'bisq') {
-      curlResponse = code.codeSampleBisq.curl;
-    }
-
     let curlNetwork = '';
     if (this.env.BASE_MODULE === 'mempool') {
       if (!['', 'mainnet'].includes(network)) {
@@ -198,6 +196,10 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
       }
     }
 
+    if (network === this.env.ROOT_NETWORK) {
+      curlNetwork = '';
+    }
+
     let text = code.codeTemplate.curl;
     for (let index = 0; index < curlResponse.length; index++) {
       const curlText = curlResponse[index];
@@ -205,12 +207,28 @@ export class ApiDocsComponent implements OnInit, AfterViewInit {
       text = text.replace('%{' + indexNumber + '}', curlText);
     }
 
-    if (websocket) {
-      const wsHostname = this.hostname.replace('https://', 'wss://');
-      wsHostname.replace('http://', 'ws://');
-      return `${wsHostname}${curlNetwork}${text}`;
-    }
     return `${this.hostname}${curlNetwork}${text}`;
+  }
+
+  websocketUrl(network: string) {
+    let curlNetwork = '';
+    if (this.env.BASE_MODULE === 'mempool') {
+      if (!['', 'mainnet'].includes(network)) {
+        curlNetwork = `/${network}`;
+      }
+    } else if (this.env.BASE_MODULE === 'liquid') {
+      if (!['', 'liquid'].includes(network)) {
+        curlNetwork = `/${network}`;
+      }
+    }
+
+    if (network === this.env.ROOT_NETWORK) {
+      curlNetwork = '';
+    }
+
+    let wsHostname = this.hostname.replace('https://', 'wss://');
+    wsHostname = wsHostname.replace('http://', 'ws://');
+    return `${wsHostname}${curlNetwork}/api/v1/ws`;
   }
 
 }

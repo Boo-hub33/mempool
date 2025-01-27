@@ -1,16 +1,16 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { ActivatedRoute, ParamMap } from '@angular/router';
-import { ElectrsApiService } from '../../services/electrs-api.service';
+import { ElectrsApiService } from '@app/services/electrs-api.service';
 import { switchMap, tap, throttleTime, catchError, shareReplay, startWith, pairwise, filter } from 'rxjs/operators';
 import { of, Subscription, asyncScheduler, forkJoin } from 'rxjs';
-import { StateService } from '../../services/state.service';
-import { SeoService } from '../../services/seo.service';
-import { OpenGraphService } from '../../services/opengraph.service';
-import { BlockExtended, TransactionStripped } from '../../interfaces/node-api.interface';
-import { ApiService } from '../../services/api.service';
-import { seoDescriptionNetwork } from '../../shared/common.utils';
-import { BlockOverviewGraphComponent } from '../../components/block-overview-graph/block-overview-graph.component';
-import { ServicesApiServices } from '../../services/services-api.service';
+import { StateService } from '@app/services/state.service';
+import { SeoService } from '@app/services/seo.service';
+import { OpenGraphService } from '@app/services/opengraph.service';
+import { BlockExtended, TransactionStripped } from '@interfaces/node-api.interface';
+import { ApiService } from '@app/services/api.service';
+import { seoDescriptionNetwork } from '@app/shared/common.utils';
+import { BlockOverviewGraphComponent } from '@components/block-overview-graph/block-overview-graph.component';
+import { ServicesApiServices } from '@app/services/services-api.service';
 
 @Component({
   selector: 'app-block-preview',
@@ -117,7 +117,7 @@ export class BlockPreviewComponent implements OnInit, OnDestroy {
         this.openGraphService.waitOver('block-data-' + this.rawId);
       }),
       throttleTime(50, asyncScheduler, { leading: true, trailing: true }),
-      shareReplay(1)
+      shareReplay({ bufferSize: 1, refCount: true })
     );
 
     this.overviewSubscription = block$.pipe(
@@ -136,7 +136,12 @@ export class BlockPreviewComponent implements OnInit, OnDestroy {
                   return of(transactions);
                 })
               ),
-            this.stateService.env.ACCELERATOR === true && block.height > 819500 ? this.servicesApiService.getAccelerationHistory$({ blockHash: block.id }) : of([])
+            this.stateService.env.ACCELERATOR === true && block.height > 819500
+              ? this.servicesApiService.getAllAccelerationHistory$({ blockHeight: block.height })
+                .pipe(catchError(() => {
+                  return of([]);
+                }))
+              : of([])
           ]);
         }
       ),

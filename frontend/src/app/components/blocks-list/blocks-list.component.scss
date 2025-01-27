@@ -1,7 +1,9 @@
 .spinner-border {
   height: 25px;
   width: 25px;
-  margin-top: 13px;
+  margin-top: -10px;
+  margin-left: -13px;
+  flex-shrink: 0;
 }
 
 .container-xl {
@@ -46,7 +48,7 @@ tr, td, th {
 }
 
 .progress {
-  background-color: #2d3348;
+  background-color: var(--secondary);
 }
 
 .pool {
@@ -266,7 +268,7 @@ tr, td, th {
 
 .tooltip-custom .tooltiptext {
   visibility: hidden;
-  color: #fff;
+  color: var(--fg);
   text-align: center;
   padding: 5px 0;
   border-radius: 6px;
