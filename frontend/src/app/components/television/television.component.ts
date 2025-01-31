@@ -1,9 +1,9 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { WebsocketService } from '../../services/websocket.service';
-import { OptimizedMempoolStats } from '../../interfaces/node-api.interface';
-import { StateService } from '../../services/state.service';
-import { ApiService } from '../../services/api.service';
-import { SeoService } from '../../services/seo.service';
+import { WebsocketService } from '@app/services/websocket.service';
+import { OptimizedMempoolStats } from '@interfaces/node-api.interface';
+import { StateService } from '@app/services/state.service';
+import { ApiService } from '@app/services/api.service';
+import { SeoService } from '@app/services/seo.service';
 import { ActivatedRoute } from '@angular/router';
 import { map, scan, startWith, switchMap, tap } from 'rxjs/operators';
 import { interval, merge, Observable, Subscription } from 'rxjs';
@@ -71,7 +71,9 @@ export class TelevisionComponent implements OnInit, OnDestroy {
           mempoolStats = newStats;
         } else if (['2h', '24h'].includes(this.fragment)) {
           mempoolStats.unshift(newStats[0]);
-          mempoolStats = mempoolStats.slice(0, mempoolStats.length - 1);
+          const now = Date.now() / 1000;
+          const start = now - (this.fragment === '2h' ? (2 * 60 * 60) : (24 * 60 * 60) );
+          mempoolStats = mempoolStats.filter(p => p.added >= start);
         }
         return mempoolStats;
       })

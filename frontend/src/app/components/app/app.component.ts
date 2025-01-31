@@ -1,9 +1,11 @@
 import { Location } from '@angular/common';
 import { Component, HostListener, OnInit, Inject, LOCALE_ID, HostBinding } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
-import { StateService } from '../../services/state.service';
-import { OpenGraphService } from '../../services/opengraph.service';
+import { StateService } from '@app/services/state.service';
+import { OpenGraphService } from '@app/services/opengraph.service';
 import { NgbTooltipConfig } from '@ng-bootstrap/ng-bootstrap';
+import { ThemeService } from '@app/services/theme.service';
+import { SeoService } from '@app/services/seo.service';
 
 @Component({
   selector: 'app-root',
@@ -12,12 +14,12 @@ import { NgbTooltipConfig } from '@ng-bootstrap/ng-bootstrap';
   providers: [NgbTooltipConfig]
 })
 export class AppComponent implements OnInit {
-  link: HTMLElement = document.getElementById('canonical');
-
   constructor(
     public router: Router,
     private stateService: StateService,
     private openGraphService: OpenGraphService,
+    private seoService: SeoService,
+    private themeService: ThemeService,
     private location: Location,
     tooltipConfig: NgbTooltipConfig,
     @Inject(LOCALE_ID) private locale: string,
@@ -39,7 +41,7 @@ export class AppComponent implements OnInit {
 
   @HostListener('document:keydown', ['$event'])
   handleKeyboardEvents(event: KeyboardEvent) {
-    if (event.target instanceof HTMLInputElement) {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
       return;
     }
     // prevent arrow key horizontal scrolling
@@ -52,13 +54,7 @@ export class AppComponent implements OnInit {
   ngOnInit() {
     this.router.events.subscribe((val) => {
       if (val instanceof NavigationEnd) {
-        let domain = 'mempool.space';
-        if (this.stateService.env.BASE_MODULE === 'liquid') {
-          domain = 'liquid.network';
-        } else if (this.stateService.env.BASE_MODULE === 'bisq') {
-          domain = 'bisq.markets';
-        }
-        this.link.setAttribute('href', 'https://' + domain + this.location.path());
+        this.seoService.updateCanonical(this.location.path());
       }
     });
   }

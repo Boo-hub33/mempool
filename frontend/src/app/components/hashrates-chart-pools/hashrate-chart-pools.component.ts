@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Inject, Input, LOCALE_ID, OnInit, HostBinding } from '@angular/core';
-import { EChartsOption } from '../../graphs/echarts';
+import { EChartsOption } from '@app/graphs/echarts';
 import { Observable } from 'rxjs';
 import { delay, map, retryWhen, share, startWith, switchMap, tap } from 'rxjs/operators';
-import { ApiService } from '../../services/api.service';
-import { SeoService } from '../../services/seo.service';
+import { ApiService } from '@app/services/api.service';
+import { SeoService } from '@app/services/seo.service';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
-import { chartColors, poolsColor } from '../../app.constants';
-import { StorageService } from '../../services/storage.service';
-import { MiningService } from '../../services/mining.service';
-import { download } from '../../shared/graphs.utils';
+import { chartColors, poolsColor } from '@app/app.constants';
+import { StorageService } from '@app/services/storage.service';
+import { MiningService } from '@app/services/mining.service';
+import { download } from '@app/shared/graphs.utils';
 import { ActivatedRoute } from '@angular/router';
+import { StateService } from '@app/services/state.service';
 
 interface Hashrate {
   timestamp: number;
@@ -27,7 +28,7 @@ interface Hashrate {
       position: absolute;
       top: 50%;
       left: calc(50% - 15px);
-      z-index: 100;
+      z-index: 99;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,6 +61,7 @@ export class HashrateChartPoolsComponent implements OnInit {
     private cd: ChangeDetectorRef,
     private storageService: StorageService,
     private miningService: MiningService,
+    public stateService: StateService,
     private route: ActivatedRoute,
   ) {
     this.radioGroupForm = this.formBuilder.group({ dateSpan: '1y' });
@@ -70,6 +72,7 @@ export class HashrateChartPoolsComponent implements OnInit {
     let firstRun = true;
 
     this.seoService.setTitle($localize`:@@mining.pools-historical-dominance:Pools Historical Dominance`);
+    this.seoService.setDescription($localize`:@@meta.descriptions.bitcoin.graphs.hashrate-pools:See Bitcoin mining pool dominance visualized over time: see how top mining pools' share of total hashrate has fluctuated over time.`);
     this.miningWindowPreference = this.miningService.getDefaultTimespan('6m');
     this.radioGroupForm = this.formBuilder.group({ dateSpan: this.miningWindowPreference });
     this.radioGroupForm.controls.dateSpan.setValue(this.miningWindowPreference);
@@ -222,7 +225,7 @@ export class HashrateChartPoolsComponent implements OnInit {
         borderRadius: 4,
         shadowColor: 'rgba(0, 0, 0, 0.5)',
         textStyle: {
-          color: '#b1b1b1',
+          color: 'var(--tooltip-grey)',
           align: 'left',
         },
         borderColor: '#000',
@@ -305,7 +308,7 @@ export class HashrateChartPoolsComponent implements OnInit {
     const now = new Date();
     // @ts-ignore
     this.chartOptions.grid.bottom = 30;
-    this.chartOptions.backgroundColor = '#11131f';
+    this.chartOptions.backgroundColor = 'var(--active-bg)';
     this.chartInstance.setOption(this.chartOptions);
     download(this.chartInstance.getDataURL({
       pixelRatio: 2,

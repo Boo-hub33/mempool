@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { SeoService } from '../../../services/seo.service';
+import { SeoService } from '@app/services/seo.service';
 
 @Component({
   selector: 'app-federation-wallet',
@@ -15,6 +15,10 @@ export class FederationWalletComponent implements OnInit {
   }
 
   ngOnInit(): void {
+  }
+
+  isExpiredFragment(): boolean {
+    return location.hash === '#expired';
   }
 
 }

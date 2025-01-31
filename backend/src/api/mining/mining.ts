@@ -45,11 +45,22 @@ class Mining {
    */
   public async $getHistoricalBlockFees(interval: string | null = null): Promise<any> {
     return await BlocksRepository.$getHistoricalBlockFees(
-      this.getTimeRange(interval, 5),
+      this.getTimeRange(interval),
       Common.getSqlInterval(interval)
     );
   }
 
+  /**
+   * Get timespan block total fees
+   */
+  public async $getBlockFeesTimespan(from: number, to: number): Promise<number> {
+    return await BlocksRepository.$getHistoricalBlockFees(
+      this.getTimeRangeFromTimespan(from, to),
+      null,
+      {from, to}
+    );
+  }
+  
   /**
    * Get historical block rewards
    */
@@ -125,9 +136,13 @@ class Mining {
     poolsStatistics['blockCount'] = blockCount;
 
     const totalBlock24h: number = await BlocksRepository.$blockCount(null, '24h');
+    const totalBlock3d: number = await BlocksRepository.$blockCount(null, '3d');
+    const totalBlock1w: number = await BlocksRepository.$blockCount(null, '1w');
 
     try {
       poolsStatistics['lastEstimatedHashrate'] = await bitcoinClient.getNetworkHashPs(totalBlock24h);
+      poolsStatistics['lastEstimatedHashrate3d'] = await bitcoinClient.getNetworkHashPs(totalBlock3d);
+      poolsStatistics['lastEstimatedHashrate1w'] = await bitcoinClient.getNetworkHashPs(totalBlock1w);
     } catch (e) {
       poolsStatistics['lastEstimatedHashrate'] = 0;
       logger.debug('Bitcoin Core is not available, using zeroed value for current hashrate', logger.tags.mining);
@@ -645,6 +660,24 @@ class Mining {
       default: return 86400 * scale;
     }
   }
+
+  private getTimeRangeFromTimespan(from: number, to: number, scale = 1): number {
+    const timespan = to - from;
+    switch (true) {
+      case timespan > 3600 * 24 * 365 * 4: return 86400 * scale; // 24h
+      case timespan > 3600 * 24 * 365 * 3: return 43200 * scale; // 12h
+      case timespan > 3600 * 24 * 365 * 2: return 43200 * scale; // 12h
+      case timespan > 3600 * 24 * 365: return 28800 * scale; // 8h
+      case timespan > 3600 * 24 * 30 * 6: return 28800 * scale; // 8h
+      case timespan > 3600 * 24 * 30 * 3: return 10800 * scale; // 3h
+      case timespan > 3600 * 24 * 30: return 7200 * scale; // 2h
+      case timespan > 3600 * 24 * 7: return 1800 * scale; // 30min
+      case timespan > 3600 * 24 * 3: return 300 * scale; // 5min
+      case timespan > 3600 * 24: return 1 * scale;
+      default: return 1 * scale;
+    }
+  }
+  
 
   // Finds the oldest block in a consecutive chain back from the tip
   // assumes `blocks` is sorted in ascending height order

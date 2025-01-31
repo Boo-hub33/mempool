@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { DocsComponent } from './docs/docs.component';
+import { DocsComponent } from '@app/docs/docs/docs.component';
 
 const browserWindow = window || {};
 // @ts-ignore
@@ -8,7 +8,7 @@ const browserWindowEnv = browserWindow.__env || {};
 
 let routes: Routes = [];
 
-if (browserWindowEnv.BASE_MODULE && (browserWindowEnv.BASE_MODULE === 'bisq' || browserWindowEnv.BASE_MODULE === 'liquid')) {
+if (browserWindowEnv.BASE_MODULE && browserWindowEnv.BASE_MODULE === 'liquid') {
   routes = [
     {
       path: '',

@@ -1,7 +1,8 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, HostListener, OnInit } from '@angular/core';
-import { SeoService } from '../../services/seo.service';
-import { WebsocketService } from '../../services/websocket.service';
-import { StateService } from '../../services/state.service';
+import { SeoService } from '@app/services/seo.service';
+import { OpenGraphService } from '@app/services/opengraph.service';
+import { WebsocketService } from '@app/services/websocket.service';
+import { StateService } from '@app/services/state.service';
 import { EventType, NavigationStart, Router } from '@angular/router';
 
 @Component({
@@ -11,21 +12,23 @@ import { EventType, NavigationStart, Router } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MiningDashboardComponent implements OnInit, AfterViewInit {
-  graphHeight = 375;
+  hashrateGraphHeight = 335;
+  poolGraphHeight = 375;
 
   constructor(
     private seoService: SeoService,
+    private ogService: OpenGraphService,
     private websocketService: WebsocketService,
     private stateService: StateService,
     private router: Router
-  ) {
-    this.seoService.setTitle($localize`:@@a681a4e2011bb28157689dbaa387de0dd0aa0c11:Mining Dashboard`);
-    this.seoService.setDescription($localize`:@@meta.description.mining.dashboard:Get real-time Bitcoin mining stats like hashrate, difficulty adjustment, block rewards, pool dominance, and more.`);
-  }
+  ) { }
 
   ngOnInit(): void {
     this.onResize();
     this.websocketService.want(['blocks', 'mempool-blocks', 'stats']);
+    this.seoService.setTitle($localize`:@@a681a4e2011bb28157689dbaa387de0dd0aa0c11:Mining Dashboard`);
+    this.seoService.setDescription($localize`:@@meta.description.mining.dashboard:Get real-time Bitcoin mining stats like hashrate, difficulty adjustment, block rewards, pool dominance, and more.`);
+    this.ogService.setManualOgImage('mining.jpg');
   }
 
   ngAfterViewInit(): void {
@@ -42,11 +45,14 @@ export class MiningDashboardComponent implements OnInit, AfterViewInit {
   @HostListener('window:resize', ['$event'])
   onResize(): void {
     if (window.innerWidth >= 992) {
-      this.graphHeight = 335;
+      this.hashrateGraphHeight = 335;
+      this.poolGraphHeight = 375;
     } else if (window.innerWidth >= 768) {
-      this.graphHeight = 245;
+      this.hashrateGraphHeight = 245;
+      this.poolGraphHeight = 265;
     } else {
-      this.graphHeight = 240;
+      this.hashrateGraphHeight = 240;
+      this.poolGraphHeight = 240;
     }
   }
 }

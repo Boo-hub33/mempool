@@ -1,15 +1,15 @@
 import { ChangeDetectionStrategy, Component, OnInit, HostBinding, NgZone } from '@angular/core';
 import { Router } from '@angular/router';
-import { EChartsOption, PieSeriesOption } from '../../graphs/echarts';
+import { EChartsOption, PieSeriesOption } from '@app/graphs/echarts';
 import { map, Observable, share, tap } from 'rxjs';
-import { chartColors } from '../../app.constants';
-import { ApiService } from '../../services/api.service';
-import { SeoService } from '../../services/seo.service';
-import { StateService } from '../../services/state.service';
-import { download } from '../../shared/graphs.utils';
-import { AmountShortenerPipe } from '../../shared/pipes/amount-shortener.pipe';
-import { RelativeUrlPipe } from '../../shared/pipes/relative-url/relative-url.pipe';
-import { getFlagEmoji } from '../../shared/common.utils';
+import { chartColors } from '@app/app.constants';
+import { ApiService } from '@app/services/api.service';
+import { SeoService } from '@app/services/seo.service';
+import { StateService } from '@app/services/state.service';
+import { download } from '@app/shared/graphs.utils';
+import { AmountShortenerPipe } from '@app/shared/pipes/amount-shortener.pipe';
+import { RelativeUrlPipe } from '@app/shared/pipes/relative-url/relative-url.pipe';
+import { getFlagEmoji } from '@app/shared/common.utils';
 
 @Component({
   selector: 'app-nodes-per-country-chart',
@@ -37,7 +37,7 @@ export class NodesPerCountryChartComponent implements OnInit {
     private seoService: SeoService,
     private amountShortenerPipe: AmountShortenerPipe,
     private zone: NgZone,
-    private stateService: StateService,
+    public stateService: StateService,
     private router: Router,
   ) {
   }
@@ -85,7 +85,7 @@ export class NodesPerCountryChartComponent implements OnInit {
         name: country.name.en + (this.isMobile() ? `` : ` (${country.share}%)`),
         label: {
           overflow: 'truncate',
-          color: '#b1b1b1',
+          color: 'var(--tooltip-grey)',
           alignTo: 'edge',
           edgeDistance: edgeDistance,
         },
@@ -95,7 +95,7 @@ export class NodesPerCountryChartComponent implements OnInit {
           borderRadius: 4,
           shadowColor: 'rgba(0, 0, 0, 0.5)',
           textStyle: {
-            color: '#b1b1b1',
+            color: 'var(--tooltip-grey)',
           },
           borderColor: '#000',
           formatter: () => {
@@ -119,7 +119,7 @@ export class NodesPerCountryChartComponent implements OnInit {
       name: $localize`Other (${totalShareOther.toFixed(2) + '%'})`,
       label: {
         overflow: 'truncate',
-        color: '#b1b1b1',
+        color: 'var(--tooltip-grey)',
         alignTo: 'edge',
         edgeDistance: edgeDistance
       },
@@ -128,7 +128,7 @@ export class NodesPerCountryChartComponent implements OnInit {
         borderRadius: 4,
         shadowColor: 'rgba(0, 0, 0, 0.5)',
         textStyle: {
-          color: '#b1b1b1',
+          color: 'var(--tooltip-grey)',
         },
         borderColor: '#000',
         formatter: () => {
@@ -220,7 +220,7 @@ export class NodesPerCountryChartComponent implements OnInit {
 
   onSaveChart() {
     const now = new Date();
-    this.chartOptions.backgroundColor = '#11131f';
+    this.chartOptions.backgroundColor = 'var(--active-bg)';
     this.chartInstance.setOption(this.chartOptions);
     download(this.chartInstance.getDataURL({
       pixelRatio: 2,

@@ -1,16 +1,16 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, ParamMap } from '@angular/router';
-import { ElectrsApiService } from '../../services/electrs-api.service';
+import { ElectrsApiService } from '@app/services/electrs-api.service';
 import { switchMap, filter, catchError, map, tap } from 'rxjs/operators';
-import { Address, Transaction } from '../../interfaces/electrs.interface';
-import { StateService } from '../../services/state.service';
-import { OpenGraphService } from '../../services/opengraph.service';
-import { AudioService } from '../../services/audio.service';
-import { ApiService } from '../../services/api.service';
+import { Address, Transaction } from '@interfaces/electrs.interface';
+import { StateService } from '@app/services/state.service';
+import { OpenGraphService } from '@app/services/opengraph.service';
+import { AudioService } from '@app/services/audio.service';
+import { ApiService } from '@app/services/api.service';
 import { of, merge, Subscription, Observable } from 'rxjs';
-import { SeoService } from '../../services/seo.service';
-import { seoDescriptionNetwork } from '../../shared/common.utils';
-import { AddressInformation } from '../../interfaces/node-api.interface';
+import { SeoService } from '@app/services/seo.service';
+import { seoDescriptionNetwork } from '@app/shared/common.utils';
+import { AddressInformation } from '@interfaces/node-api.interface';
 
 @Component({
   selector: 'app-address-preview',
@@ -69,7 +69,7 @@ export class AddressPreviewComponent implements OnInit, OnDestroy {
             this.addressString = this.addressString.toLowerCase();
           }
           this.seoService.setTitle($localize`:@@address.component.browser-title:Address: ${this.addressString}:INTERPOLATION:`);
-          this.seoService.setDescription($localize`:@@meta.description.bitcoin.address:See mempool transactions, confirmed transactions, balance, and more for ${this.stateService.network==='liquid'||this.stateService.network==='liquidtestnet'?'Liquid':'Bitcoin'} ${seoDescriptionNetwork(this.stateService.network)} address ${this.addressString}:INTERPOLATION:.`);
+          this.seoService.setDescription($localize`:@@meta.description.bitcoin.address:See mempool transactions, confirmed transactions, balance, and more for ${this.stateService.network==='liquid'||this.stateService.network==='liquidtestnet'?'Liquid':'Bitcoin'}${seoDescriptionNetwork(this.stateService.network)} address ${this.addressString}:INTERPOLATION:.`);
 
           return (this.addressString.match(/04[a-fA-F0-9]{128}|(02|03)[a-fA-F0-9]{64}/)
               ? this.electrsApiService.getPubKeyAddress$(this.addressString)

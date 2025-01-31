@@ -1,8 +1,8 @@
 import { Component, OnInit, ChangeDetectionStrategy, SecurityContext, ChangeDetectorRef } from '@angular/core';
-import { WebsocketService } from '../../services/websocket.service';
-import { Observable, Subject, map } from 'rxjs';
-import { StateService } from '../../services/state.service';
-import { HealthCheckHost } from '../../interfaces/websocket.interface';
+import { WebsocketService } from '@app/services/websocket.service';
+import { Observable, Subject, map, tap } from 'rxjs';
+import { StateService } from '@app/services/state.service';
+import { HealthCheckHost } from '@interfaces/websocket.interface';
 import { DomSanitizer } from '@angular/platform-browser';
 
 @Component({
@@ -13,7 +13,7 @@ import { DomSanitizer } from '@angular/platform-browser';
 })
 export class ServerHealthComponent implements OnInit {
   hosts$: Observable<HealthCheckHost[]>;
-  tip$: Subject<number>;
+  maxHeight: number;
   interval: number;
   now: number = Date.now();
 
@@ -44,9 +44,14 @@ export class ServerHealthComponent implements OnInit {
           host.flag = this.parseFlag(host.host);
         }
         return hosts;
+      }),
+      tap(hosts => {
+        let newMaxHeight = 0;
+        for (const host of hosts) {
+          newMaxHeight = Math.max(newMaxHeight, host.latestHeight);
+        }
       })
     );
-    this.tip$ = this.stateService.chainTip$;
     this.websocketService.want(['mempool-blocks', 'stats', 'blocks', 'tomahawk']);
 
     this.interval = window.setInterval(() => {
@@ -62,7 +67,7 @@ export class ServerHealthComponent implements OnInit {
   getLastUpdateSeconds(host: HealthCheckHost): string {
     if (host.lastChecked) {
       const seconds = Math.ceil((this.now - host.lastChecked) / 1000);
-      return `${seconds} second${seconds > 1 ? 's' : '  '} ago`;
+      return `${seconds} s`;
     } else {
       return '~';
     }
@@ -77,6 +82,10 @@ export class ServerHealthComponent implements OnInit {
       return '🇺🇸';
     } else if (host.includes('.va1.')) {
       return '🇺🇸';
+    } else if (host.includes('.sg1.')) {
+      return '🇸🇬';
+    } else if (host.includes('.hnl.')) {
+      return '🤙';
     } else {
       return '';
     }

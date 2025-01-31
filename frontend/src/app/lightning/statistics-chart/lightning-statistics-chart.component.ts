@@ -1,16 +1,17 @@
 import { Component, Inject, Input, LOCALE_ID, OnInit, HostBinding, OnChanges, SimpleChanges } from '@angular/core';
-import { echarts, EChartsOption } from '../../graphs/echarts';
+import { echarts, EChartsOption } from '@app/graphs/echarts';
 import { Observable, combineLatest, fromEvent } from 'rxjs';
 import { map, share, startWith, switchMap, tap } from 'rxjs/operators';
-import { SeoService } from '../../services/seo.service';
+import { SeoService } from '@app/services/seo.service';
 import { formatNumber } from '@angular/common';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
-import { StorageService } from '../../services/storage.service';
-import { MiningService } from '../../services/mining.service';
-import { download } from '../../shared/graphs.utils';
-import { LightningApiService } from '../lightning-api.service';
-import { AmountShortenerPipe } from '../../shared/pipes/amount-shortener.pipe';
-import { isMobile } from '../../shared/common.utils';
+import { StorageService } from '@app/services/storage.service';
+import { MiningService } from '@app/services/mining.service';
+import { download } from '@app/shared/graphs.utils';
+import { LightningApiService } from '@app/lightning/lightning-api.service';
+import { AmountShortenerPipe } from '@app/shared/pipes/amount-shortener.pipe';
+import { isMobile } from '@app/shared/common.utils';
+import { StateService } from '@app/services/state.service';
 
 @Component({
   selector: 'app-lightning-statistics-chart',
@@ -21,7 +22,7 @@ import { isMobile } from '../../shared/common.utils';
       position: absolute;
       top: 50%;
       left: calc(50% - 15px);
-      z-index: 100;
+      z-index: 99;
     }
   `],
 })
@@ -55,6 +56,7 @@ export class LightningStatisticsChartComponent implements OnInit, OnChanges {
     private formBuilder: UntypedFormBuilder,
     private storageService: StorageService,
     private miningService: MiningService,
+    public stateService: StateService,
     private amountShortenerPipe: AmountShortenerPipe,
   ) {
   }
@@ -162,7 +164,7 @@ export class LightningStatisticsChartComponent implements OnInit, OnChanges {
         borderRadius: 4,
         shadowColor: 'rgba(0, 0, 0, 0.5)',
         textStyle: {
-          color: '#b1b1b1',
+          color: 'var(--tooltip-grey)',
           align: 'left',
         },
         borderColor: '#000',
@@ -237,7 +239,7 @@ export class LightningStatisticsChartComponent implements OnInit, OnChanges {
           splitLine: {
             lineStyle: {
               type: 'dotted',
-              color: '#ffffff66',
+              color: 'var(--transparent-fg)',
               opacity: 0.25,
             }
           },
@@ -278,7 +280,7 @@ export class LightningStatisticsChartComponent implements OnInit, OnChanges {
             symbol: 'none',
             lineStyle: {
               type: 'solid',
-              color: '#ffffff66',
+              color: 'var(--transparent-fg)',
               opacity: 1,
               width: 1,
             },
@@ -346,7 +348,7 @@ export class LightningStatisticsChartComponent implements OnInit, OnChanges {
     const now = new Date();
     // @ts-ignore
     this.chartOptions.grid.bottom = 40;
-    this.chartOptions.backgroundColor = '#11131f';
+    this.chartOptions.backgroundColor = 'var(--active-bg)';
     this.chartInstance.setOption(this.chartOptions);
     download(this.chartInstance.getDataURL({
       pixelRatio: 2,

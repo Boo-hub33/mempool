@@ -1,18 +1,18 @@
 import { ChangeDetectionStrategy, Component, Inject, Input, LOCALE_ID, OnInit, HostBinding } from '@angular/core';
-import { echarts, EChartsOption } from '../../graphs/echarts';
+import { echarts, EChartsOption } from '@app/graphs/echarts';
 import { combineLatest, fromEvent, merge, Observable, of } from 'rxjs';
 import { map, mergeMap, share, startWith, switchMap, tap } from 'rxjs/operators';
-import { ApiService } from '../../services/api.service';
-import { SeoService } from '../../services/seo.service';
+import { ApiService } from '@app/services/api.service';
+import { SeoService } from '@app/services/seo.service';
 import { formatNumber } from '@angular/common';
 import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
-import { selectPowerOfTen } from '../../bitcoin.utils';
-import { StorageService } from '../../services/storage.service';
-import { MiningService } from '../../services/mining.service';
-import { download } from '../../shared/graphs.utils';
+import { selectPowerOfTen } from '@app/bitcoin.utils';
+import { StorageService } from '@app/services/storage.service';
+import { MiningService } from '@app/services/mining.service';
+import { download } from '@app/shared/graphs.utils';
 import { ActivatedRoute } from '@angular/router';
-import { StateService } from '../../services/state.service';
-import { seoDescriptionNetwork } from '../../shared/common.utils';
+import { StateService } from '@app/services/state.service';
+import { seoDescriptionNetwork } from '@app/shared/common.utils';
 
 @Component({
   selector: 'app-hashrate-chart',
@@ -23,7 +23,7 @@ import { seoDescriptionNetwork } from '../../shared/common.utils';
       position: absolute;
       top: 50%;
       left: calc(50% - 15px);
-      z-index: 100;
+      z-index: 99;
     }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,7 +60,7 @@ export class HashrateChartComponent implements OnInit {
     private storageService: StorageService,
     private miningService: MiningService,
     private route: ActivatedRoute,
-    private stateService: StateService
+    public stateService: StateService
   ) {
   }
 
@@ -242,7 +242,7 @@ export class HashrateChartComponent implements OnInit {
         borderRadius: 4,
         shadowColor: 'rgba(0, 0, 0, 0.5)',
         textStyle: {
-          color: '#b1b1b1',
+          color: 'var(--tooltip-grey)',
           align: 'left',
         },
         borderColor: '#000',
@@ -326,7 +326,7 @@ export class HashrateChartComponent implements OnInit {
             },
           },
         ],
-        selected: JSON.parse(this.storageService.getValue('hashrate_difficulty_legend')) ?? {
+        selected: JSON.parse(this.storageService?.getValue('hashrate_difficulty_legend') || 'null') ?? {
           '$localize`:@@79a9dc5b1caca3cbeb1733a19515edacc5fc7920:Hashrate`': true,
           '$localize`::Difficulty`': this.network === '',
           '$localize`Hashrate (MA)`': true,
@@ -339,6 +339,9 @@ export class HashrateChartComponent implements OnInit {
             const newMin = Math.floor(value.min / selectedPowerOfTen.divider / 10);
             return newMin * selectedPowerOfTen.divider * 10;
           },
+          max: (value) => {
+            return value.max;
+          },
           type: 'value',
           axisLabel: {
             color: 'rgb(110, 112, 121)',
@@ -346,22 +349,31 @@ export class HashrateChartComponent implements OnInit {
               const selectedPowerOfTen: any = selectPowerOfTen(val);
               const newVal = Math.round(val / selectedPowerOfTen.divider);
               return `${newVal} ${selectedPowerOfTen.unit}H/s`;
-            }
+            },
+            showMinLabel: false,
+            showMaxLabel: false,
           },
           splitLine: {
             lineStyle: {
               type: 'dotted',
-              color: '#ffffff66',
+              color: 'var(--transparent-fg)',
               opacity: 0.25,
             }
           },
         },
         {
-          min: (value) => {
-            return value.min * 0.9;
-          },
           type: 'value',
           position: 'right',
+          min: (_) => {
+            const firstYAxisMin = this.chartInstance.getModel().getComponent('yAxis', 0).axis.scale.getExtent()[0];
+            const selectedPowerOfTen: any = selectPowerOfTen(firstYAxisMin);
+            const newMin = Math.floor(firstYAxisMin / selectedPowerOfTen.divider / 10)
+            return 600 / 2 ** 32 * newMin * selectedPowerOfTen.divider * 10;
+          },
+          max: (_) => {
+            const firstYAxisMax = this.chartInstance.getModel().getComponent('yAxis', 0).axis.scale.getExtent()[1];
+            return 600 / 2 ** 32 * firstYAxisMax;
+          },
           axisLabel: {
             color: 'rgb(110, 112, 121)',
             formatter: (val): string => {
@@ -371,7 +383,9 @@ export class HashrateChartComponent implements OnInit {
               const selectedPowerOfTen: any = selectPowerOfTen(val);
               const newVal = Math.round(val / selectedPowerOfTen.divider);
               return `${newVal} ${selectedPowerOfTen.unit}`;
-            }
+            },
+            showMinLabel: false,
+            showMaxLabel: false,
           },
           splitLine: {
             show: false,
@@ -462,7 +476,7 @@ export class HashrateChartComponent implements OnInit {
     const now = new Date();
     // @ts-ignore
     this.chartOptions.grid.bottom = 30;
-    this.chartOptions.backgroundColor = '#11131f';
+    this.chartOptions.backgroundColor = 'var(--active-bg)';
     this.chartInstance.setOption(this.chartOptions);
     download(this.chartInstance.getDataURL({
       pixelRatio: 2,

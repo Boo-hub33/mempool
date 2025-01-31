@@ -10,14 +10,9 @@
     margin: 25px;
     line-height: 32px;
   }
-  .unknown {
-    border: 1px solid #b4b4b4;
-  }
 
   .image.not-rounded {
     border-radius: 0;
-    width: 60px;
-    height: 60px;
   }
 
   .intro {
@@ -97,6 +92,13 @@
     }
   }
 
+  .whale-sponsor {
+    img {
+      width: 70px;
+      height: 70px;
+    }
+  }
+
   .alliances {
     margin-bottom: 100px;
     a {
@@ -129,8 +131,9 @@
       position: relative;
       width: 300px;
     }
-    .bisq {
-      top: 3px;
+    .sv {
+      height: 85px;
+      width: auto;
       position: relative;
     }
   }
@@ -158,6 +161,11 @@
         }
         img, svg {
           margin: 40px 29px 10px;
+          &.image.coldcard {
+            border-radius: 0;
+            height: auto;
+            margin: 20px 29px 20px;
+          }
         }
       }
     }
@@ -175,6 +183,10 @@
       width: 72px;
       height: 72px;
     }
+  }
+
+  #project-members a.project-member-avatar img {
+    margin: 40px 20px 10px;
   }
 
   .copyright {
@@ -245,4 +257,13 @@
 .community-integrations-sponsor img.image {
   width: 64px;
   height: 64px;
+}
+
+.enterprise-sponsor {
+  .wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 800px; 
+  }
 }

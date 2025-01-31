@@ -9,6 +9,7 @@ import { Observable, map } from 'rxjs';
 })
 export class ReservesRatioStatsComponent implements OnInit {
   @Input() fullHistory$: Observable<any>;
+  @Input() emergencyUtxosStats$: Observable<any>;
   unbackedMonths$: Observable<any>
 
   constructor() { }
@@ -33,7 +34,7 @@ export class ReservesRatioStatsComponent implements OnInit {
           let avg = 0;
           for (let i = 0; i < ratioSeries.length; i++) {
             avg += ratioSeries[i];
-            if (ratioSeries[i] < 1) {
+            if (ratioSeries[i] < 0.95) {
               total++;
             }
           }
